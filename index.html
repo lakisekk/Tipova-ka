@@ -237,6 +237,10 @@ tbody tr.me{background:var(--me-bg)}
 .tiprow{display:grid;grid-template-columns:1fr auto;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:var(--r-s);background:var(--card)}
 .tiprow.locked{background:var(--card-2)}
 .tipinputs{display:flex;align-items:center;gap:5px}
+.postbox{display:inline-flex;align-items:center;gap:4px;margin-right:8px;cursor:pointer;
+  font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;user-select:none}
+.postbox input{width:auto;margin:0}
+.match.is-post .score,.match.is-post .teams{opacity:.62}
 .tipinputs input{width:46px;text-align:center;padding:7px 4px;font-weight:700;font-variant-numeric:tabular-nums}
 .tipinputs .sep{color:var(--muted);font-weight:700}
 .pill{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:22px;padding:0 6px;border-radius:6px;font-size:12px;font-weight:800;font-variant-numeric:tabular-nums}
@@ -603,7 +607,7 @@ function migrate(d){
   const old = {}; (d.matches||[]).forEach(m=>old[m.id]=m);
   s.matches = buildFixtures().map(m=>{
     const o = old[m.id];
-    return o ? Object.assign(m,{hs:o.hs??null, as:o.as??null, date:o.date||m.date, time:o.time||m.time}) : m;
+    return o ? Object.assign(m,{hs:o.hs??null, as:o.as??null, post:!!o.post, date:o.date||m.date, time:o.time||m.time}) : m;
   });
   return s;
 }
@@ -627,6 +631,13 @@ function kick(m){ return new Date(m.date+"T"+m.time+":00"); }
 function fmtDay(m){ const d=kick(m); return DAYS[d.getDay()]+" "+d.getDate()+". "+(d.getMonth()+1)+"."; }
 function fmtLong(iso){ const d=new Date(iso+"T12:00:00"); return d.getDate()+". "+MONTHS[d.getMonth()]+" "+d.getFullYear(); }
 function played(m){ return m.hs!==null && m.as!==null; }
+// Odložený zápas = označený správcem a zatím bez výsledku. Jakmile se dohraje
+// a výsledek se zadá, příznak ztrácí smysl a bere se jako odehraný.
+function postponed(m){ return !!m.post && !played(m); }
+// Kolo je vyřízené, když je každý zápas buď odehraný, nebo odložený —
+// jinak by úvodní stránka zamrzla na kole, které čeká na náhradní termín.
+function settled(m){ return played(m) || postponed(m); }
+function roundPostponed(r){ return roundMatches(r).filter(postponed); }
 function crest(k,size){
   const t=TMAP[k]; if(!t) return "";
   return `<span class="crest ${size}" data-t="${t.sl}" style="--c1:${t.c1};--c2:${t.c2}" title="${esc(t.full)}">${t.ab}</span>`;
@@ -659,11 +670,14 @@ function audit(){
   }
   // rozehraná kola bez kompletních výsledků
   ROUNDS.forEach(r=>{
-    const ms=roundMatches(r), done=ms.filter(played).length;
-    if(done && done<ms.length)
-      out.push({lvl:"warn", txt:`${r}. kolo — zadáno jen ${done} z ${ms.length} výsledků.`});
-    if(!done && isLocked(r) && kick(ms[ms.length-1]) < new Date())
+    const ms=roundMatches(r), done=ms.filter(played).length, post=roundPostponed(r);
+    const chybi = ms.length - done - post.length;
+    if(done && chybi>0)
+      out.push({lvl:"warn", txt:`${r}. kolo — chybí ${chybi} z ${ms.length} výsledků.`});
+    if(!done && !post.length && isLocked(r) && kick(ms[ms.length-1]) < new Date())
       out.push({lvl:"warn", txt:`${r}. kolo je odehrané, ale nemá zadaný ani jeden výsledek.`});
+    if(post.length)
+      out.push({lvl:"info", txt:`${r}. kolo — odloženo: ${post.map(m=>m.h+" – "+m.a).join(", ")}. Až se dohraje, zadej výsledek.`});
   });
   // vklady
   const unpaid=S.players.filter(p=>!p.paid);
@@ -803,11 +817,12 @@ function isLocked(r){
 function roundState(r){
   const ms=roundMatches(r);
   if(ms.every(played)) return "done";
+  if(ms.every(settled)) return "waiting";   // dohráno až na odložené zápasy
   if(!isLocked(r)) return "open";
   return "live";
 }
 function currentRound(){
-  for(const r of ROUNDS){ if(roundState(r)!=="done") return r; }
+  for(const r of ROUNDS){ const st=roundState(r); if(st!=="done" && st!=="waiting") return r; }
   return ROUNDS[ROUNDS.length-1];
 }
 function points(tip,m){
@@ -866,7 +881,7 @@ function applyResultsFeed(d){
   rows.forEach(row=>{
     const hs = row.hs ?? row.homeScore ?? row.hg;
     const as = row.as ?? row.awayScore ?? row.ag;
-    if(hs==null || as==null) return;
+    if((hs==null || as==null) && !row.post) return;
     let m = row.id ? S.matches.find(x=>x.id===row.id) : null;
     if(!m){
       const H=findTeams(String(row.home||row.h||"")), A=findTeams(String(row.away||row.a||""));
@@ -874,7 +889,11 @@ function applyResultsFeed(d){
       m = S.matches.find(x=>x.h===H[0].k && x.a===A[0].k);
     }
     if(!m) return;
-    if(m.hs!==+hs || m.as!==+as){ m.hs=+hs; m.as=+as; n++; }
+    if(row.post && (hs==null || as==null)){
+      if(!m.post){ m.post=true; n++; }
+      return;
+    }
+    if(m.hs!==+hs || m.as!==+as || m.post){ m.hs=+hs; m.as=+as; m.post=false; n++; }
   });
   if(n){ S.feedAt = d.updated || new Date().toISOString(); save(); }
   return n;
@@ -900,7 +919,9 @@ function loadResultsFeed(){
 function resultsExport(){
   return JSON.stringify({
     updated:new Date().toISOString(),
-    results:S.matches.filter(played).map(m=>({id:m.id, home:m.h, away:m.a, hs:m.hs, as:m.as}))
+    results:S.matches.filter(m=>played(m)||postponed(m))
+      .map(m=>postponed(m) ? {id:m.id, home:m.h, away:m.a, post:true}
+                           : {id:m.id, home:m.h, away:m.a, hs:m.hs, as:m.as})
   }, null, 1);
 }
 
@@ -999,9 +1020,12 @@ function viewHome(){
          <span class="cd-units"><i>dny</i><i>hodiny</i><i>minuty</i><i>sekundy</i></span>
        </div>` : "";
 
+  const curPost = roundPostponed(cur).length;
   const statusLine = st==="open"
     ? `Tipy na ${cur}. kolo jsou otevřené do ${dl?fmtDay({date:ms[0].date,time:ms[0].time})+" "+ms[0].time:"výkopu"}`
-    : st==="live" ? `${cur}. kolo běží — tipy jsou uzavřené` : "Všechna kola dohraná";
+    : st==="live" ? `${cur}. kolo běží — tipy jsou uzavřené${curPost?", "+curPost+" zápas odložen":""}`
+    : st==="waiting" ? `${cur}. kolo čeká na dohrávku odloženého zápasu`
+    : "Všechna kola dohraná";
 
   return `
   ${countdown}
@@ -1028,7 +1052,8 @@ function viewHome(){
   <div class="card">
     <div class="spread" style="margin-bottom:8px">
       <h2 style="margin:0">${cur}. kolo</h2>
-      <span class="tag ${st==="done"?"done":st==="open"?"open":"live"}">${st==="done"?"dohráno":st==="open"?"tipy otevřené":"tipy uzavřené"}</span>
+      <span class="tag ${st==="done"?"done":st==="open"?"open":st==="waiting"?"":"live"}">${
+        st==="done"?"dohráno":st==="open"?"tipy otevřené":st==="waiting"?"čeká na dohrávku":"tipy uzavřené"}</span>
     </div>
     ${ms.map(matchRow).join("")}
     <div class="row" style="margin-top:14px">
@@ -1062,17 +1087,17 @@ function viewHome(){
 }
 
 function matchRow(m){
-  const done = played(m);
+  const done = played(m), post = postponed(m);
   const now = Date.now(), ko = kick(m).getTime();
-  const label = done ? "Odehráno" : (now>ko ? "Hraje se" : "Naplánováno");
-  return `<a class="match" href="#/zapas/${m.id}" data-zapas="${m.id}">
-    <div class="when"><span>${label}</span><time>${fmtDay(m)} · ${m.time}</time></div>
+  const label = post ? "Odloženo" : done ? "Odehráno" : (now>ko ? "Hraje se" : "Naplánováno");
+  return `<a class="match${post?" is-post":""}" href="#/zapas/${m.id}" data-zapas="${m.id}">
+    <div class="when"><span>${label}</span><time>${post?"termín neznámý":fmtDay(m)+" · "+m.time}</time></div>
     <div class="teams">
       <span class="side">${crest(m.h,"s")}<span>${esc(m.h)}</span></span>
       <span class="vs">–</span>
       <span class="side away">${crest(m.a,"s")}<span>${esc(m.a)}</span></span>
     </div>
-    <div class="score">${done ? m.hs+" : "+m.as : '<span class="tbd">–:–</span>'}</div>
+    <div class="score">${done ? m.hs+" : "+m.as : post ? '<span class="tbd">odl.</span>' : '<span class="tbd">–:–</span>'}</div>
   </a>`;
 }
 
@@ -1085,9 +1110,11 @@ function viewRozpis(){
     const st = roundState(r);
     const done = ms.filter(played).length;
     const win = st==="done" ? roundStandings(r)[0] : null;
+    const post = roundPostponed(r).length;
     const tag = st==="done" ? `<span class="tag done">dohráno</span>`
+              : st==="waiting" ? `<span class="tag">čeká na ${post} odložený zápas</span>`
               : st==="open" ? `<span class="tag open">tipy otevřené</span>`
-              : `<span class="tag live">${done}/8 výsledků</span>`;
+              : `<span class="tag live">${done}/8 výsledků${post?" · "+post+" odl.":""}</span>`;
     return `<a class="plink ${r===cur?"me":""}" href="#/kolo/${r}" data-kolo="${r}">
       <span class="rk">${r}.</span>
       <span class="nm">
@@ -1106,6 +1133,7 @@ function viewKolo(){
   const ms = roundMatches(r).slice().sort((a,b)=>kick(a)-kick(b));
   const st = roundState(r);
   const done = ms.filter(played).length;
+  const postCount = roundPostponed(r).length;
   const rows = roundStandings(r);
   const scored = rows.some(x=>x.pts>0);
   const best = scored ? rows[0].pts : null;
@@ -1128,8 +1156,9 @@ function viewKolo(){
       <h1 style="font-size:26px;margin:2px 0 6px">${r}. kolo</h1>
       <p class="hero-meta" style="margin:0">${
         st==="done" ? `Dohráno · ${goals} gólů · průměr ${avg.toFixed(1).replace(".",",")} bodu na hráče`
+      : st==="waiting" ? `Odehráno ${done} z 8 · ${postCount} ${postCount===1?"zápas čeká":"zápasy čekají"} na náhradní termín`
       : st==="open" ? `Tipy otevřené do ${fmtDay(ms[0])} ${ms[0].time}`
-      : `Zadáno ${done} z 8 výsledků`}</p>
+      : `Zadáno ${done} z 8 výsledků${postCount?" · "+postCount+" odloženo":""}`}</p>
     </div>
   </div>
 
@@ -1274,7 +1303,7 @@ function viewProfil(){
           return `<tr class="${v===3?"exact-hit":""}">
             <td><a href="#/zapas/${m.id}" data-zapas="${m.id}" style="display:inline-flex;align-items:center;gap:6px;color:inherit">${crest(m.h,"s")}${esc(TMAP[m.h].full)} – ${esc(TMAP[m.a].full)}${crest(m.a,"s")}</a></td>
             <td class="num">${t?t.h+":"+t.a:'<span class="tbd">–:–</span>'}</td>
-            <td class="num">${played(m)?m.hs+":"+m.as:'<span class="tbd">–:–</span>'}</td>
+            <td class="num">${played(m)?m.hs+":"+m.as:postponed(m)?'<span class="tbd">odl.</span>':'<span class="tbd">–:–</span>'}</td>
             <td class="num">${v===null?'<span class="pts-none">—</span>':`<span class="pts pts-${v===3?5:v}">${v}</span>`}</td>
           </tr>`;
         }).join("")}</tbody>
@@ -1326,14 +1355,15 @@ function viewZapas(){
   <p class="muted small" style="margin:0 0 12px"><a href="#/rozpis" data-go="rozpis" data-round="${m.r}">← ${m.r}. kolo</a></p>
 
   <div class="hero hero-sm fade" style="text-align:center">
-    <div class="hero-eyebrow">${m.r}. kolo · ${fmtDay(m)} ${m.time}</div>
+    <div class="hero-eyebrow">${m.r}. kolo · ${postponed(m)?"odloženo":fmtDay(m)+" "+m.time}</div>
     <div class="row" style="justify-content:center;gap:14px;margin:12px 0 2px">
       <span class="row" style="gap:9px">${crest(m.h,"l")}<strong style="font-size:18px">${esc(TMAP[m.h].full)}</strong></span>
       <span style="font-size:26px;font-weight:800;font-variant-numeric:tabular-nums">${played(m)?m.hs+" : "+m.as:"–:–"}</span>
       <span class="row" style="gap:9px"><strong style="font-size:18px">${esc(TMAP[m.a].full)}</strong>${crest(m.a,"l")}</span>
     </div>
     ${played(m)?`<p class="hero-meta" style="justify-content:center;margin:8px 0 0">Přesně trefilo ${exact} z ${n} ${n===1?"tipujícího":"tipujících"}</p>`
-              :`<p class="hero-meta" style="justify-content:center;margin:8px 0 0">Zápas se ještě nehrál</p>`}
+      :postponed(m)?`<p class="hero-meta" style="justify-content:center;margin:8px 0 0">Zápas byl odložen, náhradní termín zatím není známý. Tipy zůstávají platné.</p>`
+      :`<p class="hero-meta" style="justify-content:center;margin:8px 0 0">Zápas se ještě nehrál</p>`}
   </div>
 
   ${ n ? `<div class="grid cols-2">
@@ -1836,18 +1866,24 @@ function adminVysledky(){
       <label class="row tiny" style="gap:6px"><input type="checkbox" data-act="lock" data-round="${r}" ${S.locks[r]?"checked":""}> zamknout tipy ručně</label>
     </div>
     <div class="tipgrid">
-      ${ms.map(m=>`<div class="tiprow">
+      ${ms.map(m=>`<div class="tiprow${postponed(m)?" locked":""}">
         <div style="display:flex;align-items:center;gap:8px;min-width:0">
           <span style="display:flex;align-items:center;gap:7px;flex:1;min-width:0">${crest(m.h,"s")}<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(m.h)}</span></span>
           <span class="muted tiny">–</span>
           <span style="display:flex;align-items:center;gap:7px;flex:1;min-width:0;flex-direction:row-reverse;text-align:right">${crest(m.a,"s")}<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(m.a)}</span></span>
         </div>
         <div class="tipinputs">
+          <label class="postbox" title="Zápas odložen na neznámý termín">
+            <input type="checkbox" data-post="${m.id}" ${m.post?"checked":""}><span>odl.</span>
+          </label>
           <input type="number" min="0" max="20" inputmode="numeric" data-res="${m.id}" data-side="h" value="${m.hs??""}" aria-label="Góly ${esc(m.h)}">
           <span class="sep">:</span>
           <input type="number" min="0" max="20" inputmode="numeric" data-res="${m.id}" data-side="a" value="${m.as??""}" aria-label="Góly ${esc(m.a)}">
         </div>
       </div>`).join("")}
+    <p class="muted tiny" style="margin:12px 0 0">Zaškrtni <strong>odl.</strong> u zápasu, který se nehrál a nemá náhradní termín.
+      Kolo se tím přestane blokovat a úvodní stránka se posune dál. Jakmile zápas dohrají, prostě zadáš výsledek —
+      příznak se zruší sám a body se dopočítají.</p>
     </div>
     <div class="row" style="margin-top:14px">
       <button class="btn" data-act="save-results" data-round="${r}">Uložit výsledky</button>
@@ -2222,19 +2258,25 @@ document.addEventListener("click", e=>{
   else if(act==="logout"){ ADMIN=false; render(); }
 
   else if(act==="save-results"){
-    let n=0;
+    let n=0, pn=0;
+    document.querySelectorAll("[data-post]").forEach(cb=>{
+      const m=S.matches.find(x=>x.id===cb.dataset.post);
+      if(m) m.post = cb.checked;
+    });
     document.querySelectorAll("[data-res]").forEach(inp=>{
       if(inp.dataset.side!=="h") return;
       const mid=inp.dataset.res, m=S.matches.find(x=>x.id===mid);
       const a=document.querySelector(`[data-res="${mid}"][data-side="a"]`);
-      if(inp.value!==""&&a.value!==""){ m.hs=+inp.value; m.as=+a.value; n++; }
+      if(inp.value!==""&&a.value!==""){ m.hs=+inp.value; m.as=+a.value; m.post=false; n++; }
       else { m.hs=null; m.as=null; }
     });
-    save(); toast(`Zapsáno ${n} výsledků, body se přepočítaly.`);
+    S.matches.forEach(m=>{ if(postponed(m)) pn++; });
+    save();
+    toast(`Zapsáno ${n} výsledků${pn?", odložených zápasů: "+pn:""}.`);
   }
   else if(act==="clear-results"){
     if(!confirm(`Vymazat výsledky ${r}. kola?`)) return;
-    roundMatches(r).forEach(m=>{m.hs=null;m.as=null;});
+    roundMatches(r).forEach(m=>{m.hs=null;m.as=null;m.post=false;});
     save(); toast(`${r}. kolo vymazáno.`);
   }
   else if(act==="lock"){ S.locks[r]=t.checked; save(); }
