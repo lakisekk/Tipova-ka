@@ -519,7 +519,8 @@ const TMAP = {}; TEAMS.forEach(t=>TMAP[t.k]=t);
 
 // Losovací pořadí přesně podle oficiálního rozpisu Chance Ligy 2026/27.
 const DRAW = [
-  {r:11, date:"2026-10-17", m:[["Slovácko","Zbrojovka"],["Olomouc","Liberec"],["Boleslav","Teplice"],["Jablonec","Plzeň"],["Artis","Bohemians"],["Slavia","Hradec"],["Pardubice","Zlín"],["Baník","Sparta"]]},
+  {r:11, date:"2026-10-17", m:[["Slovácko","Zbrojovka"],["Olomouc","Liberec"],["Boleslav","Teplice"],["Jablonec","Plzeň"],["Artis","Bohemians"],["Slavia","Hradec"],["Pardubice","Zlín"],["Baník","Sparta"]],
+   k:[[1,"13:00"],[0,"18:00"],[0,"15:00"],[1,"18:00"],[0,"15:00"],[0,"15:00"],[0,"15:00"],[1,"15:00"]]},
   {r:12, date:"2026-10-24", m:[["Plzeň","Pardubice"],["Slavia","Boleslav"],["Hradec","Jablonec"],["Zlín","Olomouc"],["Teplice","Artis"],["Zbrojovka","Bohemians"],["Liberec","Baník"],["Sparta","Slovácko"]]},
   {r:13, date:"2026-10-31", m:[["Bohemians","Sparta"],["Baník","Plzeň"],["Pardubice","Liberec"],["Slovácko","Teplice"],["Olomouc","Zbrojovka"],["Boleslav","Hradec"],["Artis","Zlín"],["Jablonec","Slavia"]]},
   {r:14, date:"2026-11-07", m:[["Plzeň","Sparta"],["Liberec","Bohemians"],["Zbrojovka","Baník"],["Teplice","Pardubice"],["Zlín","Slovácko"],["Hradec","Olomouc"],["Jablonec","Boleslav"],["Slavia","Artis"]]},
@@ -534,14 +535,20 @@ const DRAW = [
 // Orientační výkopy — datum kola je sobota, zápasy se rozloží na so/ne. Admin je může přepsat.
 const SLOTS = [ [0,"15:00"],[0,"15:00"],[0,"15:00"],[0,"18:00"],[1,"13:00"],[1,"15:00"],[1,"17:00"],[1,"19:00"] ];
 
+// Zvýš, až doplníš skutečné výkopy dalšího kola — stránka si pak přepíše
+// odhadnuté termíny, ale ručně upravené nechá být.
+const FIXTURES_V = 2;
+
 function buildFixtures(){
   const out=[];
   DRAW.forEach(rd=>{
     rd.m.forEach((pair,i)=>{
-      const [off,time]=SLOTS[i];
+      const [off,time] = (rd.k && rd.k[i]) ? rd.k[i] : SLOTS[i];
+      const official = !!(rd.k && rd.k[i]);
       const d=new Date(rd.date+"T12:00:00"); d.setDate(d.getDate()+off);
       const iso=d.toISOString().slice(0,10);
-      out.push({ id:"m"+rd.r+"-"+(i+1), r:rd.r, h:pair[0], a:pair[1], date:iso, time, hs:null, as:null });
+      out.push({ id:"m"+rd.r+"-"+(i+1), r:rd.r, h:pair[0], a:pair[1], date:iso, time, official,
+                 hs:null, as:null, post:false, edited:false });
     });
   });
   return out;
@@ -573,6 +580,7 @@ function applyTheme(t){
 function freshState(){
   return {
     v:1,
+    fxv:FIXTURES_V,
     updated:null,
     title:"Tipovačka Chance Liga 2026/27",
     players:[],                 // {id,name,paid}
@@ -603,12 +611,22 @@ function migrate(d){
   s.cfg = Object.assign(base.cfg, d.cfg||{});
   // Data bez log (čerstvý build, starší záloha) nesmí smazat loga, která už jsou nahraná.
   s.logos = (d.logos && Object.keys(d.logos).length) ? d.logos : keepLogos;
-  // rozpis vždy srovnat se zabudovaným losem, výsledky a časy si ponechat
+  // Rozpis se vždy srovná se zabudovaným losem. Výsledky a příznaky si ponechá.
+  // Termíny: když přijde novější verze rozpisu, odhadnuté časy se přepíšou
+  // oficiálními — ale co správce nastavil ručně, zůstává nedotčené.
   const old = {}; (d.matches||[]).forEach(m=>old[m.id]=m);
+  const upgrade = (+d.fxv||0) < FIXTURES_V;
   s.matches = buildFixtures().map(m=>{
     const o = old[m.id];
-    return o ? Object.assign(m,{hs:o.hs??null, as:o.as??null, post:!!o.post, date:o.date||m.date, time:o.time||m.time}) : m;
+    if(!o) return m;
+    const keep = !!o.edited || !upgrade;
+    return Object.assign(m, {
+      hs:o.hs??null, as:o.as??null, post:!!o.post, edited:!!o.edited,
+      date: keep ? (o.date||m.date) : m.date,
+      time: keep ? (o.time||m.time) : m.time
+    });
   });
+  s.fxv = FIXTURES_V;
   return s;
 }
 
@@ -1892,6 +1910,35 @@ function adminVysledky(){
   </div>
 
   <div class="card">
+    <div class="spread" style="margin-bottom:6px">
+      <h3 style="margin:0">Termíny ${r}. kola</h3>
+      ${roundMatches(r).some(m=>m.official) ? `<span class="tag done">oficiální rozpis</span>`
+        : `<span class="tag open">odhadnuté časy</span>`}
+    </div>
+    <p class="muted small">U kol, která liga ještě nevypsala, jsou časy jen orientační — slouží hlavně k určení uzávěrky tipů.
+      Jakmile termíny znáš, přepiš je tady. Ručně upravený termín už ti žádná pozdější verze stránky nepřepíše.</p>
+    <div class="tipgrid">
+      ${ms.map(m=>`<div class="tiprow">
+        <div style="display:flex;align-items:center;gap:8px;min-width:0">
+          <span style="display:flex;align-items:center;gap:7px;flex:1;min-width:0">${crest(m.h,"s")}<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(m.h)}</span></span>
+          <span class="muted tiny">–</span>
+          <span style="display:flex;align-items:center;gap:7px;flex:1;min-width:0;flex-direction:row-reverse;text-align:right">${crest(m.a,"s")}<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(m.a)}</span></span>
+        </div>
+        <div class="row" style="gap:6px;flex-wrap:nowrap">
+          ${m.edited?`<span class="tag" title="Termín upraven ručně">ruč.</span>`:""}
+          <input type="date" data-date="${m.id}" value="${m.date}" style="padding:6px 8px;font-size:13px">
+          <input type="time" data-time="${m.id}" value="${m.time}" step="300" style="padding:6px 8px;font-size:13px;width:92px">
+        </div>
+      </div>`).join("")}
+    </div>
+    <div class="row" style="margin-top:14px">
+      <button class="btn" data-act="save-dates" data-round="${r}">Uložit termíny</button>
+      <button class="btn secondary" data-act="reset-dates" data-round="${r}">Vrátit výchozí</button>
+    </div>
+    <p class="muted tiny" style="margin:10px 0 0">Uzávěrka tipů se počítá z nejbližšího výkopu v kole, takže posunutím termínu se posune i ona.</p>
+  </div>
+
+  <div class="card">
     <h3 style="margin-top:0">Vložit výsledky hromadně</h3>
     <p class="muted small">Zkopíruj výsledky odkudkoli (Flashscore, Livesport, iSport) a vlož je sem. Rozpozná řádky jako <em>Slavia 2:1 Sparta</em> i <em>Slavia – Sparta 2:1</em>. Kolo se dohledá podle dvojice týmů.</p>
     <textarea id="paste" rows="7" placeholder="Slovácko 1:1 Zbrojovka&#10;Olomouc – Liberec 2:0&#10;Boleslav 3 : 2 Teplice"></textarea>
@@ -2273,6 +2320,23 @@ document.addEventListener("click", e=>{
     S.matches.forEach(m=>{ if(postponed(m)) pn++; });
     save();
     toast(`Zapsáno ${n} výsledků${pn?", odložených zápasů: "+pn:""}.`);
+  }
+  else if(act==="save-dates"){
+    let n=0;
+    document.querySelectorAll("[data-date]").forEach(inp=>{
+      const m=S.matches.find(x=>x.id===inp.dataset.date); if(!m) return;
+      const t=document.querySelector(`[data-time="${inp.dataset.date}"]`);
+      const d=inp.value, tm=t?t.value:m.time;
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(d) || !/^\d{2}:\d{2}/.test(tm)) return;
+      if(m.date!==d || m.time!==tm.slice(0,5)){ m.date=d; m.time=tm.slice(0,5); m.edited=true; n++; }
+    });
+    save(); toast(n?`Upraveno ${n} termínů.`:"Termíny se nezměnily.");
+  }
+  else if(act==="reset-dates"){
+    if(!confirm(`Vrátit u ${r}. kola termíny podle rozpisu? Ruční úpravy se ztratí.`)) return;
+    const base={}; buildFixtures().forEach(m=>base[m.id]=m);
+    roundMatches(r).forEach(m=>{ const b=base[m.id]; if(b){ m.date=b.date; m.time=b.time; m.edited=false; } });
+    save(); toast(`Termíny ${r}. kola obnoveny.`);
   }
   else if(act==="clear-results"){
     if(!confirm(`Vymazat výsledky ${r}. kola?`)) return;
