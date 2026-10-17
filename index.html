@@ -231,6 +231,12 @@ tbody tr.me{background:var(--me-bg)}
 .poster .amount{font-size:40px;font-weight:800;letter-spacing:-.035em;color:var(--lime);margin:2px 0 4px;font-variant-numeric:tabular-nums}
 .poster .sub{font-size:14px;opacity:.92}
 .poster .meta{margin-top:10px;font-size:13px;opacity:.8}
+.poster .payouts{display:flex;justify-content:center;gap:clamp(14px,5vw,38px);margin-top:4px}
+.poster .payout{display:flex;flex-direction:column;align-items:center;gap:1px}
+.poster .payout i{font-style:normal;font-size:11px;font-weight:700;letter-spacing:.1em;opacity:.65}
+.poster .payout b{font-size:clamp(14px,3.4vw,18px);font-weight:800;letter-spacing:-.02em}
+.pod .prize{display:block;font-size:11.5px;font-weight:700;color:rgba(255,255,255,.85);margin-bottom:6px}
+.pod-1 .prize{color:var(--lime)}
 
 /* ---------- tip grid ---------- */
 .tipgrid{display:grid;gap:8px}
@@ -588,7 +594,7 @@ function freshState(){
     tips:{},                    // tips[playerId][matchId] = {h,a}
     locks:{},                   // locks[round] = true → ručně uzamčeno
     logos:{},                   // logos[teamKey] = data URI nahraného loga
-    cfg:{ fee:200, pin:"1234", potNote:"Vítěz bere vše", feedUrl:"" }
+    cfg:{ fee:200, pin:"1234", potNote:"Vítěz bere vše", feedUrl:"", prizes:[3000,600,200] }
   };
 }
 
@@ -607,8 +613,10 @@ function load(){
 function migrate(d){
   const base = freshState();
   const keepLogos = (S && S.logos) ? S.logos : {};
+  const baseCfg = base.cfg;            // pozor: Object.assign níž přepíše base.cfg referencí z dat
   const s = Object.assign(base, d);
-  s.cfg = Object.assign(base.cfg, d.cfg||{});
+  s.cfg = Object.assign({}, baseCfg, d.cfg||{});
+  if(!Array.isArray(s.cfg.prizes)) s.cfg.prizes = baseCfg.prizes.slice();
   // Data bez log (čerstvý build, starší záloha) nesmí smazat loga, která už jsou nahraná.
   s.logos = (d.logos && Object.keys(d.logos).length) ? d.logos : keepLogos;
   // Rozpis se vždy srovná se zabudovaným losem. Výsledky a příznaky si ponechá.
@@ -965,6 +973,18 @@ function positionsAfter(r){
   return pos;
 }
 
+// Rozdělení banku. Vrací jen místa, na která se opravdu vyplácí.
+function prizeList(){
+  const pr = (S.cfg && S.cfg.prizes) || [];
+  return pr.map((v,i)=>({pos:i+1, amount:+v||0})).filter(x=>x.amount>0);
+}
+function prizeFor(pos){
+  const pr = (S.cfg && S.cfg.prizes) || [];
+  return +pr[pos-1] || 0;
+}
+function prizeTotal(){ return prizeList().reduce((s,x)=>s+x.amount,0); }
+function kc(n){ return (+n||0).toLocaleString("cs-CZ")+" Kč"; }
+
 function myPlayerId(){ try{ return localStorage.getItem(MYTIPS_KEY)||""; }catch(e){ return ""; } }
 function setMyPlayerId(id){ try{ id?localStorage.setItem(MYTIPS_KEY,id):localStorage.removeItem(MYTIPS_KEY); }catch(e){} }
 function isAdminDevice(){ try{ return localStorage.getItem(ADMINDEV_KEY)==="1"; }catch(e){ return false; } }
@@ -1098,9 +1118,11 @@ function viewHome(){
 
   <div class="poster">
     <div class="tagline">Hraje se o</div>
-    <div class="amount">${pot.toLocaleString("cs-CZ")} Kč</div>
-    <div class="sub">${esc(S.cfg.potNote)} · vklad ${S.cfg.fee} Kč na hráče</div>
-    <div class="meta">Zaplatilo ${paidCount} z ${S.players.length} hráčů</div>
+    <div class="amount">${kc(prizeTotal()||pot)}</div>
+    ${prizeList().length?`<div class="payouts">${prizeList().map(x=>
+      `<span class="payout"><i>${["1.","2.","3."][x.pos-1]||x.pos+"."}</i><b>${kc(x.amount)}</b></span>`).join("")}</div>`
+      :`<div class="sub">${esc(S.cfg.potNote)}</div>`}
+    <div class="meta">Vklad ${S.cfg.fee} Kč · zaplatilo ${paidCount} z ${S.players.length} hráčů</div>
   </div>`;
 }
 
@@ -1338,6 +1360,7 @@ function podium(rows){
       <span class="avatar ava">${esc(row.p.name.trim().charAt(0).toUpperCase())}</span>
       <span class="nm">${esc(row.p.name)}</span>
       <span class="sc">${row.pts} <small>b · ${row.ex}× přesně</small></span>
+      ${prizeFor(pos)?`<span class="prize">${kc(prizeFor(pos))}</span>`:""}
       <span class="block">${pos}</span>
     </a>`;
   return `<div class="podium-wrap">
@@ -1782,11 +1805,19 @@ function viewPravidla(){
 
   <div class="card">
     <h2 style="margin-top:0">O co se hraje</h2>
-    <p>Vstupné je <strong>${S.cfg.fee} Kč</strong> na hráče. Celý bank bere vítěz
-       průběžného pořadí po odehraných kolech.</p>
-    ${paid?`<p class="muted">Aktuálně je ve hře <strong>${pot.toLocaleString("cs-CZ")} Kč</strong>
-       (zaplatilo ${paid} ${paid===1?"hráč":paid<5?"hráči":"hráčů"}).</p>`
+    <p>Vstupné je <strong>${S.cfg.fee} Kč</strong> na hráče. Bank se dělí mezi první tři
+       v konečném pořadí po ${R2}. kole.</p>
+    ${prizeList().length?`<table><thead><tr><th>Místo</th><th class="num">Výhra</th></tr></thead>
+      <tbody>${prizeList().map(x=>`<tr>
+        <td>${["🥇 První","🥈 Druhé","🥉 Třetí"][x.pos-1]||x.pos+". místo"}</td>
+        <td class="num"><strong>${kc(x.amount)}</strong></td></tr>`).join("")}
+      <tr><td class="muted">Celkem</td><td class="num muted">${kc(prizeTotal())}</td></tr>
+      </tbody></table>
+      <p class="muted">Třetí místo bere zpátky svůj vklad.</p>`:""}
+    ${paid?`<p class="muted">Zaplatilo ${paid} ${paid===1?"hráč":paid<5?"hráči":"hráčů"}, v banku je ${kc(pot)}.</p>`
       :`<p class="muted">Zatím vklad nezaplatil nikdo, bank je prázdný.</p>`}
+    <p class="muted">Rozdělení banku platí pro tuhle tipovačku. U dalších ročníků se může změnit —
+       podle počtu hráčů i podle toho, na čem se domluvíme.</p>
   </div>
 
   <div class="card">
@@ -2130,6 +2161,16 @@ function adminNastaveni(){
   return `<div class="card fade" style="max-width:440px">
     <h3 style="margin-top:0">Nastavení</h3>
     <label class="fld"><span>Vklad na hráče (Kč)</span><input type="number" min="0" id="cfgfee" value="${S.cfg.fee}"></label>
+    <div class="row" style="gap:8px;align-items:flex-end;margin-bottom:12px">
+      <label class="fld" style="margin:0;flex:1"><span>1. místo</span><input type="number" min="0" id="cfgp1" value="${prizeFor(1)}"></label>
+      <label class="fld" style="margin:0;flex:1"><span>2. místo</span><input type="number" min="0" id="cfgp2" value="${prizeFor(2)}"></label>
+      <label class="fld" style="margin:0;flex:1"><span>3. místo</span><input type="number" min="0" id="cfgp3" value="${prizeFor(3)}"></label>
+    </div>
+    ${(()=>{ const pot=S.players.filter(p=>p.paid).length*(S.cfg.fee||0), t=prizeTotal();
+      if(!t||!pot) return "";
+      if(t===pot) return `<div class="banner ok">Výhry sedí s bankem: ${kc(t)}.</div>`;
+      return `<div class="banner">Výhry dávají ${kc(t)}, ale v banku je ${kc(pot)} — rozdíl ${kc(Math.abs(t-pot))} ${t>pot?"chybí":"přebývá"}.</div>`;
+    })()}
     <label class="fld"><span>Popisek banku</span><input id="cfgnote" value="${esc(S.cfg.potNote)}"></label>
     <label class="fld"><span>PIN správce</span><input id="cfgpin" value="${esc(S.cfg.pin)}"></label>
     <button class="btn" data-act="save-cfg">Uložit nastavení</button>
@@ -2463,6 +2504,7 @@ document.addEventListener("click", e=>{
   }
   else if(act==="save-cfg"){
     S.cfg.fee=+document.getElementById("cfgfee").value||0;
+    S.cfg.prizes=[1,2,3].map(i=>+document.getElementById("cfgp"+i).value||0);
     S.cfg.potNote=document.getElementById("cfgnote").value.trim()||"Vítěz bere vše";
     S.cfg.pin=document.getElementById("cfgpin").value.trim()||"1234";
     save(); toast("Nastavení uloženo.");
