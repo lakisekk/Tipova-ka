@@ -1,0 +1,45 @@
+name: Výsledky
+
+on:
+  schedule:
+    # Zápasy se hrají odpoledne a večer. Časy jsou v UTC (= místní čas minus 1 nebo 2 hodiny).
+    - cron: "*/20 11-22 * * 5,6,0"   # pá, so, ne — každých 20 minut
+    - cron: "17 6,18 * * *"          # každý den dvakrát, ať se zachytí dohrávky a změny termínů
+  workflow_dispatch:                 # ruční spuštění tlačítkem v záložce Actions
+
+permissions:
+  contents: write
+
+concurrency:
+  group: vysledky
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Stáhnout výsledky
+        env:
+          LEAGUE_ID: "4631"        # Czech First League na TheSportsDB
+          SEASON: "2026-2027"
+          ROUNDS: "11,12,13,14,15,16,17,18,19,20"
+        run: python3 scripts/vysledky.py
+
+      - name: Uložit, pokud se něco změnilo
+        run: |
+          git config user.name  "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add vysledky.json
+          # commituj jen při skutečné změně výsledků, ne kvůli časové značce
+          if git diff --staged --quiet; then
+            echo "Beze změny."
+          elif [ "$(git diff --staged -U0 -- vysledky.json | grep -c '^[+-][^+-]')" = "2" ] \
+               && git diff --staged -U0 -- vysledky.json | grep -q '"updated"'; then
+            echo "Změnila se jen časová značka, necommituju."
+            git restore --staged vysledky.json && git checkout -- vysledky.json
+          else
+            git commit -m "Výsledky $(date -u '+%Y-%m-%d %H:%M') UTC"
+            git push
+          fi
