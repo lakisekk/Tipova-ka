@@ -1,5 +1,5 @@
 {
- "updated": "2026-10-18T19:27:39Z",
+ "updated": "2026-10-18T19:34:59Z",
  "source": "TheSportsDB · Czech First League",
  "results": [
   {
@@ -89,10 +89,493 @@
   },
   {
    "round": 12,
+   "home": "Liberec",
+   "away": "Baník",
+   "date": "2026-10-24",
+   "time": "15:00"
+  },
+  {
+   "round": 12,
+   "home": "Zbrojovka",
+   "away": "Bohemians",
+   "date": "2026-10-24",
+   "time": "15:00"
+  },
+  {
+   "round": 12,
+   "home": "Teplice",
+   "away": "Artis",
+   "date": "2026-10-24",
+   "time": "15:00"
+  },
+  {
+   "round": 12,
+   "home": "Plzeň",
+   "away": "Pardubice",
+   "date": "2026-10-25",
+   "time": "18:00"
+  },
+  {
+   "round": 12,
+   "home": "Sparta",
+   "away": "Slovácko",
+   "date": "2026-10-25",
+   "time": "15:00"
+  },
+  {
+   "round": 12,
    "home": "Hradec",
    "away": "Jablonec",
    "date": "2026-10-25",
    "time": "13:00"
+  },
+  {
+   "round": 13,
+   "home": "Jablonec",
+   "away": "Slavia",
+   "date": "2026-10-31",
+   "time": "15:00"
+  },
+  {
+   "round": 13,
+   "home": "Olomouc",
+   "away": "Zbrojovka",
+   "date": "2026-10-31",
+   "time": "18:00"
+  },
+  {
+   "round": 13,
+   "home": "Slovácko",
+   "away": "Teplice",
+   "date": "2026-10-31",
+   "time": "15:00"
+  },
+  {
+   "round": 13,
+   "home": "Pardubice",
+   "away": "Liberec",
+   "date": "2026-10-31",
+   "time": "15:00"
+  },
+  {
+   "round": 13,
+   "home": "Artis",
+   "away": "Zlín",
+   "date": "2026-10-31",
+   "time": "15:00"
+  },
+  {
+   "round": 13,
+   "home": "Boleslav",
+   "away": "Hradec",
+   "date": "2026-11-01",
+   "time": "13:00"
+  },
+  {
+   "round": 13,
+   "home": "Baník",
+   "away": "Plzeň",
+   "date": "2026-11-01",
+   "time": "15:00"
+  },
+  {
+   "round": 13,
+   "home": "Bohemians",
+   "away": "Sparta",
+   "date": "2026-11-01",
+   "time": "18:00"
+  },
+  {
+   "round": 14,
+   "home": "Zlín",
+   "away": "Slovácko",
+   "date": "2026-11-07",
+   "time": "15:00"
+  },
+  {
+   "round": 14,
+   "home": "Liberec",
+   "away": "Bohemians",
+   "date": "2026-11-07",
+   "time": "15:00"
+  },
+  {
+   "round": 14,
+   "home": "Hradec",
+   "away": "Olomouc",
+   "date": "2026-11-07",
+   "time": "15:00"
+  },
+  {
+   "round": 14,
+   "home": "Zbrojovka",
+   "away": "Baník",
+   "date": "2026-11-07",
+   "time": "18:00"
+  },
+  {
+   "round": 14,
+   "home": "Plzeň",
+   "away": "Sparta",
+   "date": "2026-11-08",
+   "time": "18:00"
+  },
+  {
+   "round": 14,
+   "home": "Jablonec",
+   "away": "Boleslav",
+   "date": "2026-11-08",
+   "time": "15:00"
+  },
+  {
+   "round": 14,
+   "home": "Teplice",
+   "away": "Pardubice",
+   "date": "2026-11-08",
+   "time": "13:00"
+  },
+  {
+   "round": 14,
+   "home": "Slavia",
+   "away": "Artis",
+   "date": "2026-11-08",
+   "time": "15:00"
+  },
+  {
+   "round": 15,
+   "home": "Boleslav",
+   "away": "Zlín",
+   "date": "2026-11-21",
+   "time": "15:00"
+  },
+  {
+   "round": 15,
+   "home": "Olomouc",
+   "away": "Slavia",
+   "date": "2026-11-21",
+   "time": "15:00"
+  },
+  {
+   "round": 15,
+   "home": "Baník",
+   "away": "Teplice",
+   "date": "2026-11-21",
+   "time": "15:00"
+  },
+  {
+   "round": 15,
+   "home": "Bohemians",
+   "away": "Plzeň",
+   "date": "2026-11-21",
+   "time": "18:00"
+  },
+  {
+   "round": 15,
+   "home": "Artis",
+   "away": "Jablonec",
+   "date": "2026-11-21",
+   "time": "15:00"
+  },
+  {
+   "round": 15,
+   "home": "Sparta",
+   "away": "Liberec",
+   "date": "2026-11-22",
+   "time": "18:00"
+  },
+  {
+   "round": 15,
+   "home": "Slovácko",
+   "away": "Hradec",
+   "date": "2026-11-22",
+   "time": "15:00"
+  },
+  {
+   "round": 15,
+   "home": "Pardubice",
+   "away": "Zbrojovka",
+   "date": "2026-11-22",
+   "time": "13:00"
+  },
+  {
+   "round": 16,
+   "home": "Artis",
+   "away": "Slovácko",
+   "date": "2026-11-27",
+   "time": "18:00"
+  },
+  {
+   "round": 16,
+   "home": "Boleslav",
+   "away": "Olomouc",
+   "date": "2026-11-28",
+   "time": "15:00"
+  },
+  {
+   "round": 16,
+   "home": "Teplice",
+   "away": "Liberec",
+   "date": "2026-11-28",
+   "time": "15:00"
+  },
+  {
+   "round": 16,
+   "home": "Hradec",
+   "away": "Bohemians",
+   "date": "2026-11-28",
+   "time": "18:00"
+  },
+  {
+   "round": 16,
+   "home": "Slavia",
+   "away": "Baník",
+   "date": "2026-11-29",
+   "time": "13:00"
+  },
+  {
+   "round": 16,
+   "home": "Zlín",
+   "away": "Sparta",
+   "date": "2026-11-29",
+   "time": "18:00"
+  },
+  {
+   "round": 16,
+   "home": "Jablonec",
+   "away": "Pardubice",
+   "date": "2026-11-29",
+   "time": "15:00"
+  },
+  {
+   "round": 16,
+   "home": "Zbrojovka",
+   "away": "Plzeň",
+   "date": "2026-11-29",
+   "time": "15:00"
+  },
+  {
+   "round": 17,
+   "home": "Pardubice",
+   "away": "Slavia",
+   "date": "2026-12-04",
+   "time": "18:00"
+  },
+  {
+   "round": 17,
+   "home": "Sparta",
+   "away": "Boleslav",
+   "date": "2026-12-05",
+   "time": "18:00"
+  },
+  {
+   "round": 17,
+   "home": "Liberec",
+   "away": "Zbrojovka",
+   "date": "2026-12-05",
+   "time": "15:00"
+  },
+  {
+   "round": 17,
+   "home": "Slovácko",
+   "away": "Jablonec",
+   "date": "2026-12-05",
+   "time": "15:00"
+  },
+  {
+   "round": 17,
+   "home": "Olomouc",
+   "away": "Artis",
+   "date": "2026-12-05",
+   "time": "15:00"
+  },
+  {
+   "round": 17,
+   "home": "Plzeň",
+   "away": "Teplice",
+   "date": "2026-12-06",
+   "time": "15:00"
+  },
+  {
+   "round": 17,
+   "home": "Baník",
+   "away": "Hradec",
+   "date": "2026-12-06",
+   "time": "18:00"
+  },
+  {
+   "round": 17,
+   "home": "Bohemians",
+   "away": "Zlín",
+   "date": "2026-12-06",
+   "time": "13:00"
+  },
+  {
+   "round": 18,
+   "home": "Boleslav",
+   "away": "Pardubice",
+   "date": "2026-12-12",
+   "time": "15:00"
+  },
+  {
+   "round": 18,
+   "home": "Hradec",
+   "away": "Zbrojovka",
+   "date": "2026-12-12",
+   "time": "18:00"
+  },
+  {
+   "round": 18,
+   "home": "Artis",
+   "away": "Baník",
+   "date": "2026-12-12",
+   "time": "15:00"
+  },
+  {
+   "round": 18,
+   "home": "Slavia",
+   "away": "Liberec",
+   "date": "2026-12-13",
+   "time": "18:00"
+  },
+  {
+   "round": 18,
+   "home": "Jablonec",
+   "away": "Bohemians",
+   "date": "2026-12-13",
+   "time": "15:00"
+  },
+  {
+   "round": 18,
+   "home": "Olomouc",
+   "away": "Slovácko",
+   "date": "2026-12-13",
+   "time": "13:00"
+  },
+  {
+   "round": 18,
+   "home": "Zlín",
+   "away": "Plzeň",
+   "date": "2026-12-14",
+   "time": "17:00"
+  },
+  {
+   "round": 18,
+   "home": "Teplice",
+   "away": "Sparta",
+   "date": "2026-12-14",
+   "time": "19:00"
+  },
+  {
+   "round": 19,
+   "home": "Plzeň",
+   "away": "Hradec",
+   "date": "2027-01-30",
+   "time": "15:00"
+  },
+  {
+   "round": 19,
+   "home": "Liberec",
+   "away": "Zlín",
+   "date": "2027-01-30",
+   "time": "15:00"
+  },
+  {
+   "round": 19,
+   "home": "Baník",
+   "away": "Jablonec",
+   "date": "2027-01-30",
+   "time": "15:00"
+  },
+  {
+   "round": 19,
+   "home": "Bohemians",
+   "away": "Slavia",
+   "date": "2027-01-30",
+   "time": "15:00"
+  },
+  {
+   "round": 19,
+   "home": "Slovácko",
+   "away": "Boleslav",
+   "date": "2027-01-30",
+   "time": "15:00"
+  },
+  {
+   "round": 19,
+   "home": "Pardubice",
+   "away": "Olomouc",
+   "date": "2027-01-30",
+   "time": "15:00"
+  },
+  {
+   "round": 19,
+   "home": "Zbrojovka",
+   "away": "Teplice",
+   "date": "2027-01-30",
+   "time": "15:00"
+  },
+  {
+   "round": 19,
+   "home": "Sparta",
+   "away": "Artis",
+   "date": "2027-01-30",
+   "time": "15:00"
+  },
+  {
+   "round": 20,
+   "home": "Slavia",
+   "away": "Sparta",
+   "date": "2027-02-06",
+   "time": "15:00"
+  },
+  {
+   "round": 20,
+   "home": "Zlín",
+   "away": "Zbrojovka",
+   "date": "2027-02-06",
+   "time": "15:00"
+  },
+  {
+   "round": 20,
+   "home": "Boleslav",
+   "away": "Bohemians",
+   "date": "2027-02-06",
+   "time": "15:00"
+  },
+  {
+   "round": 20,
+   "home": "Jablonec",
+   "away": "Teplice",
+   "date": "2027-02-06",
+   "time": "15:00"
+  },
+  {
+   "round": 20,
+   "home": "Olomouc",
+   "away": "Baník",
+   "date": "2027-02-06",
+   "time": "15:00"
+  },
+  {
+   "round": 20,
+   "home": "Slovácko",
+   "away": "Plzeň",
+   "date": "2027-02-06",
+   "time": "15:00"
+  },
+  {
+   "round": 20,
+   "home": "Hradec",
+   "away": "Liberec",
+   "date": "2027-02-06",
+   "time": "15:00"
+  },
+  {
+   "round": 20,
+   "home": "Artis",
+   "away": "Pardubice",
+   "date": "2027-02-06",
+   "time": "15:00"
   }
  ]
 }
