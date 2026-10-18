@@ -1,0 +1,98 @@
+{
+ "updated": "2026-10-18T19:27:39Z",
+ "source": "TheSportsDB · Czech First League",
+ "results": [
+  {
+   "round": 11,
+   "home": "Slavia",
+   "away": "Hradec",
+   "date": "2026-10-17",
+   "time": "15:00",
+   "hs": 0,
+   "as": 0
+  },
+  {
+   "round": 11,
+   "home": "Boleslav",
+   "away": "Teplice",
+   "date": "2026-10-17",
+   "time": "15:00",
+   "hs": 1,
+   "as": 0
+  },
+  {
+   "round": 11,
+   "home": "Olomouc",
+   "away": "Liberec",
+   "date": "2026-10-17",
+   "time": "18:00",
+   "hs": 1,
+   "as": 0
+  },
+  {
+   "round": 11,
+   "home": "Pardubice",
+   "away": "Zlín",
+   "date": "2026-10-17",
+   "time": "15:00",
+   "hs": 3,
+   "as": 0
+  },
+  {
+   "round": 11,
+   "home": "Artis",
+   "away": "Bohemians",
+   "date": "2026-10-17",
+   "time": "15:00",
+   "post": true
+  },
+  {
+   "round": 11,
+   "home": "Jablonec",
+   "away": "Plzeň",
+   "date": "2026-10-18",
+   "time": "18:00",
+   "hs": 2,
+   "as": 3
+  },
+  {
+   "round": 11,
+   "home": "Baník",
+   "away": "Sparta",
+   "date": "2026-10-18",
+   "time": "15:00",
+   "hs": 0,
+   "as": 0
+  },
+  {
+   "round": 11,
+   "home": "Slovácko",
+   "away": "Zbrojovka",
+   "date": "2026-10-18",
+   "time": "13:00",
+   "hs": 1,
+   "as": 2
+  },
+  {
+   "round": 12,
+   "home": "Slavia",
+   "away": "Boleslav",
+   "date": "2026-10-24",
+   "time": "18:00"
+  },
+  {
+   "round": 12,
+   "home": "Zlín",
+   "away": "Olomouc",
+   "date": "2026-10-24",
+   "time": "15:00"
+  },
+  {
+   "round": 12,
+   "home": "Hradec",
+   "away": "Jablonec",
+   "date": "2026-10-25",
+   "time": "13:00"
+  }
+ ]
+}
