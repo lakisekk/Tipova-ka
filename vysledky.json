@@ -1,5 +1,5 @@
 {
- "updated": "2026-10-24T15:15:37Z",
+ "updated": "2026-10-24T17:30:15Z",
  "source": "TheSportsDB · Czech First League",
  "results": [
   {
@@ -78,7 +78,9 @@
    "home": "Slavia",
    "away": "Boleslav",
    "date": "2026-10-24",
-   "time": "18:00"
+   "time": "18:00",
+   "hs": 0,
+   "as": 1
   },
   {
    "round": 12,
