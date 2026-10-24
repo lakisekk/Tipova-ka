@@ -967,21 +967,22 @@ function applyResultsFeed(d){
 
 function feedUrl(){ return (S.cfg && S.cfg.feedUrl || "").trim() || "./vysledky.json"; }
 
+let FEED_CHECKED = null;   // kdy naposled proběhlo stažení (jen pro tuhle relaci)
+let FEED_ERR = null;
+
+// Kanál se použije i na zařízení správce. Jeho práci chrání příznaky u jednotlivých
+// zápasů (manual, edited), ne razítko celého souboru — to jen zbytečně blokovalo
+// nové výsledky, jakmile správce cokoli uložil.
 function loadResultsFeed(){
   return fetch(feedUrl(),{cache:"no-store"})
-    .then(x=>x.ok?x.json():null)
+    .then(x=>{ if(!x.ok) throw new Error("soubor nenalezen ("+x.status+")"); return x.json(); })
     .then(d=>{
-      if(!d) return 0;
-      // Na zařízení správce se rozepsaná práce nepřepisuje starším kanálem.
-      if(isAdminDevice()){
-        const fT=Date.parse(d.updated||0)||0, lT=Date.parse(S.updated||0)||0;
-        if(fT<=lT) return 0;
-      }
-      const n=applyResultsFeed(d);
+      FEED_CHECKED = new Date().toISOString(); FEED_ERR = null;
+      const n = applyResultsFeed(d);
       if(n) render();
       return n;
     })
-    .catch(()=>0);
+    .catch(err=>{ FEED_ERR = err.message || "nepodařilo se načíst"; return 0; });
 }
 
 function resultsExport(){
@@ -2024,7 +2025,9 @@ function adminVysledky(){
   <div class="card">
     <div class="spread" style="margin-bottom:6px">
       <h3 style="margin:0">Automatické výsledky</h3>
-      ${S.feedAt?`<span class="tag done">naposled ${esc(fmtAgo(S.feedAt))}</span>`:`<span class="tag">zatím nenačteno</span>`}
+      ${FEED_ERR?`<span class="tag live">chyba: ${esc(FEED_ERR)}</span>`
+        :FEED_CHECKED?`<span class="tag done">zkontrolováno ${esc(fmtAgo(FEED_CHECKED))}</span>`
+        :`<span class="tag">zatím nenačteno</span>`}
     </div>
     <p class="muted small">Stránka si sama stahuje výsledky ze souboru <code>vysledky.json</code> vedle sebe — při každém otevření
       a pak průběžně, během zápasů každé dvě minuty. Kromě skóre umí převzít i odložení zápasu a oficiální termíny výkopů.
@@ -2035,7 +2038,10 @@ function adminVysledky(){
       <button class="btn" data-act="fetch-feed">Načíst teď</button>
     </div>
     <div id="feedout"></div>
-    <p class="muted tiny" style="margin:10px 0 0">Ručně upravené termíny a ručně zadané výsledky kanál nepřepisuje.</p>
+    <p class="muted tiny" style="margin:10px 0 0">
+      Data v kanálu jsou z ${S.feedAt?esc(fmtAgo(S.feedAt)):"neznámé doby"}. Robot commituje jen při skutečné změně,
+      takže když se od minula nic neodehrálo, je tohle datum starší — to je v pořádku.
+      Ručně upravené termíny a ručně zadané výsledky kanál nikdy nepřepíše.</p>
   </div>`;
 }
 
