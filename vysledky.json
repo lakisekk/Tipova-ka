@@ -1,5 +1,5 @@
 {
- "updated": "2026-10-24T19:46:53Z",
+ "updated": "2026-10-25T14:54:02Z",
  "source": "TheSportsDB · Czech First League",
  "results": [
   {
@@ -128,14 +128,18 @@
    "home": "Sparta",
    "away": "Slovácko",
    "date": "2026-10-25",
-   "time": "15:00"
+   "time": "15:00",
+   "hs": 3,
+   "as": 0
   },
   {
    "round": 12,
    "home": "Hradec",
    "away": "Jablonec",
    "date": "2026-10-25",
-   "time": "13:00"
+   "time": "13:00",
+   "hs": 1,
+   "as": 2
   },
   {
    "round": 13,
