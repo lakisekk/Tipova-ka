@@ -308,6 +308,7 @@ tbody tr.me{background:var(--me-bg)}
 .round-cell.hot{background:var(--ok-bg);border-color:var(--ok-line)}
 .round-cell.hot b{color:var(--brand)}
 .round-cell.empty b{color:var(--dim-2)}
+.round-cell.part{border-style:dashed}
 
 .form{display:inline-flex;gap:3px;align-items:center}
 .form i{width:9px;height:9px;border-radius:50%;background:var(--dot);display:block}
@@ -997,6 +998,16 @@ function resultsExport(){
   }, null, 1);
 }
 
+// Kolo je uzavřené teprve tehdy, když mají všechny jeho zápasy výsledek.
+// Dokud se hraje nebo se čeká na dohrávku, nesmí se o něm tvrdit nic definitivního.
+function roundComplete(r){ return roundMatches(r).every(played); }
+function completeRounds(){ return ROUNDS.filter(roundComplete); }
+function roundPending(r){ return roundMatches(r).filter(m=>!played(m) && !postponed(m)).length; }
+// Body hráče jen z uzavřených kol — pro průměry a rekordy.
+function ptsInRounds(pid, rs){
+  let s=0; rs.forEach(r=>roundMatches(r).forEach(m=>{ s += points(tipOf(pid,m.id),m)||0; })); return s;
+}
+
 // Body hráčů za jedno kolo, seřazené.
 function roundStandings(r){
   const ms = roundMatches(r);
@@ -1220,6 +1231,8 @@ function viewKolo(){
   const st = roundState(r);
   const done = ms.filter(played).length;
   const postCount = roundPostponed(r).length;
+  const complete = roundComplete(r);
+  const pending = roundPending(r);
   const rows = roundStandings(r);
   const scored = rows.some(x=>x.pts>0);
   const best = scored ? rows[0].pts : null;
@@ -1254,15 +1267,18 @@ function viewKolo(){
   </div>
 
   ${ scored ? `<div class="card">
-    <h2>Kolo vyhrál</h2>
+    <h2>${complete?"Kolo vyhrál":"Průběžně vede"}</h2>
     <div class="row" style="gap:14px">
       <span class="avatar lg">${esc(rows[0].p.name.trim().charAt(0).toUpperCase())}</span>
       <div style="flex:1;min-width:0">
         <div style="font-size:19px;font-weight:800">${esc(rows[0].p.name)}</div>
-        <div class="muted small">${rows[0].pts} bodů · ${rows[0].ex}× přesně</div>
+        <div class="muted small">${rows[0].pts} ${complete?"bodů":"bodů zatím"} · ${rows[0].ex}× přesně</div>
       </div>
-      ${rows.filter(x=>x.pts===best).length>1?`<span class="tag">dělené 1. místo</span>`:""}
+      ${rows.filter(x=>x.pts===best).length>1?`<span class="tag">${complete?"dělené 1. místo":"shodně na čele"}</span>`:""}
     </div>
+    ${complete?"":`<p class="muted small" style="margin:12px 0 0">${
+      pending ? `Kolo ještě není dohrané — ${pending==1?"zbývá 1 zápas":pending<5?"zbývají "+pending+" zápasy":"zbývá "+pending+" zápasů"}. Vítěz kola se vyhlásí až potom.`
+              : "Čeká se na dohrávku odloženého zápasu, pak bude jasné, kdo kolo vyhrál."}</p>`}
   </div>`:""}
 
   <div class="card">
@@ -1289,9 +1305,10 @@ function viewKolo(){
   </div>
 
   ${ scored ? `<div class="card">
-    <h2>Pořadí po ${r}. kole</h2>
+    <h2>${complete?`Pořadí po ${r}. kole`:"Průběžné pořadí"}</h2>
+    ${complete?"":`<p class="muted small" style="margin:-4px 0 12px">Kolo se ještě dohrává, pořadí se bude měnit.</p>`}
     <div class="table-scroll"><table>
-      <thead><tr><th class="rankno">#</th><th>Hráč</th><th class="num">V kole</th><th class="num">Celkem</th>${posBefore?`<th class="num">Posun</th>`:""}</tr></thead>
+      <thead><tr><th class="rankno">#</th><th>Hráč</th><th class="num">V kole</th><th class="num">Celkem</th>${(posBefore&&complete)?`<th class="num">Posun</th>`:""}</tr></thead>
       <tbody>${standings(r).map((row,i)=>{
         const inRound = rows.find(x=>x.p.id===row.p.id);
         const move = posBefore ? (posBefore[row.p.id]||0)-(posNow[row.p.id]||0) : 0;
@@ -1300,7 +1317,7 @@ function viewKolo(){
           <td><a href="#/profil/${row.p.id}" data-profil="${row.p.id}">${esc(row.p.name)}</a></td>
           <td class="num">${inRound?inRound.pts:0}</td>
           <td class="num"><strong>${row.pts}</strong></td>
-          ${posBefore?`<td class="num">${move>0?`<span style="color:var(--ok-fg)">▲ ${move}</span>`:move<0?`<span style="color:var(--err-fg)">▼ ${-move}</span>`:`<span class="muted">–</span>`}</td>`:""}
+          ${(posBefore&&complete)?`<td class="num">${move>0?`<span style="color:var(--ok-fg)">▲ ${move}</span>`:move<0?`<span style="color:var(--err-fg)">▼ ${-move}</span>`:`<span class="muted">–</span>`}</td>`:""}
         </tr>`;
       }).join("")}</tbody>
     </table></div>
@@ -1328,9 +1345,9 @@ function viewProfil(){
   const per = ROUNDS.map(r=>{
     const ms = roundMatches(r);
     const v = ms.reduce((s,m)=>s+(points(tipOf(p.id,m.id),m)||0),0);
-    return {r, v, any:ms.some(m=>tipOf(p.id,m.id)), scored:ms.some(played)};
+    return {r, v, any:ms.some(m=>tipOf(p.id,m.id)), scored:ms.some(played), hotovo:roundComplete(r)};
   });
-  const best = Math.max(...per.filter(x=>x.scored).map(x=>x.v), -1);
+  const best = Math.max(...per.filter(x=>x.hotovo).map(x=>x.v), -1);
   const submitted = ROUNDS.every(r=>roundMatches(r).every(m=>tipOf(p.id,m.id)))
     ? "všechna kola" : (per.some(x=>x.any) ? "částečně" : null);
 
@@ -1368,7 +1385,7 @@ function viewProfil(){
   <div class="card" style="display:flex;align-items:center;gap:14px 22px;flex-wrap:wrap">
     <strong>Body po kolech</strong>
     <div class="round-strip">
-      ${per.map(x=>`<div class="round-cell ${x.scored&&x.v===best&&best>0?"hot":""} ${x.scored?"":"empty"}">
+      ${per.map(x=>`<div class="round-cell ${x.hotovo&&x.v===best&&best>0?"hot":""} ${x.scored?"":"empty"} ${x.scored&&!x.hotovo?"part":""}" ${x.scored&&!x.hotovo?'title="kolo se ještě dohrává"':""}>
         <b>${x.scored?x.v:"–"}</b><span>${x.r}. k.</span></div>`).join("")}
     </div>
     ${evald.length?`<div style="margin-left:auto;display:flex;align-items:center;gap:8px">
@@ -1381,7 +1398,8 @@ function viewProfil(){
       const ms = roundMatches(r).slice().sort((a,b)=>kick(a)-kick(b));
       const sum = ms.reduce((s,m)=>s+(points(tipOf(p.id,m.id),m)||0),0);
       const anyPlayed = ms.some(played);
-      return `<h2 style="margin-top:22px">${r}. kolo ${anyPlayed?`<span class="muted" style="font-weight:400">· ${sum} b</span>`:""}</h2>
+      const hotovo = roundComplete(r);
+      return `<h2 style="margin-top:22px">${r}. kolo ${anyPlayed?`<span class="muted" style="font-weight:400">· ${sum} b${hotovo?"":" zatím"}</span>`:""}</h2>
       <div class="card" style="padding-top:6px"><div class="table-scroll"><table>
         <thead><tr><th>Zápas</th><th class="num">Tip</th><th class="num">Výsledek</th><th class="num">Body</th></tr></thead>
         <tbody>${ms.map(m=>{
@@ -1562,8 +1580,8 @@ function viewDuel(){
     const ms = roundMatches(r);
     const pa = ms.reduce((s,m)=>s+(points(tipOf(a.id,m.id),m)||0),0);
     const pb = ms.reduce((s,m)=>s+(points(tipOf(b.id,m.id),m)||0),0);
-    return {r, pa, pb, played:ms.some(played)};
-  }).filter(x=>x.played);
+    return {r, pa, pb, hotovo:roundComplete(r)};
+  }).filter(x=>x.hotovo);
   const winA = perRound.filter(x=>x.pa>x.pb).length;
   const winB = perRound.filter(x=>x.pb>x.pa).length;
   const draws = perRound.filter(x=>x.pa===x.pb).length;
@@ -1608,6 +1626,7 @@ function viewDuel(){
 
   ${perRound.length?`<div class="card">
     <h2>Kolo po kole</h2>
+    <p class="muted small" style="margin:-4px 0 12px">Počítají se jen dohraná kola, rozehrané se připočte až celé.</p>
     <div class="row" style="gap:18px;margin-bottom:12px">
       <div><div style="font-size:22px;font-weight:800">${winA}</div><div class="tiny muted">kol pro ${esc(a.name)}</div></div>
       <div><div style="font-size:22px;font-weight:800">${draws}</div><div class="tiny muted">shodně</div></div>
@@ -1714,11 +1733,14 @@ function viewStaty(){
   const rows=standings();
   const goals=done.reduce((s,m)=>s+m.hs+m.as,0);
   const home=done.filter(m=>m.hs>m.as).length, draw=done.filter(m=>m.hs===m.as).length, away=done.filter(m=>m.hs<m.as).length;
-  const playedRounds = ROUNDS.filter(r=>roundMatches(r).some(played));
+  // Rekordy a průměry počítáme jen z uzavřených kol. Rozehrané kolo má málo zápasů,
+  // takže by falešně vyhrálo „nejtěžší kolo" a rozbilo průměry i série.
+  const hotova = completeRounds();
+  const rozehrano = ROUNDS.filter(r=>!roundComplete(r) && roundMatches(r).some(played));
 
   // --- rekordy ---
   let bestRound=null, worstRound=null;
-  playedRounds.forEach(r=>{
+  hotova.forEach(r=>{
     const rs=roundStandings(r);
     rs.forEach(x=>{ if(!bestRound || x.pts>bestRound.pts) bestRound={p:x.p, pts:x.pts, r}; });
     const prum=rs.length?rs.reduce((s,x)=>s+x.pts,0)/rs.length:0;
@@ -1728,7 +1750,7 @@ function viewStaty(){
   // nejdelší série kol s aspoň jedním přesným tipem
   const streaks = S.players.map(p=>{
     let best=0, cur=0;
-    playedRounds.forEach(r=>{
+    hotova.forEach(r=>{
       const hit = roundMatches(r).some(m=>points(tipOf(p.id,m.id),m)===3);
       cur = hit ? cur+1 : 0;
       if(cur>best) best=cur;
@@ -1766,14 +1788,21 @@ function viewStaty(){
   </div>
 
   <div class="card">
-    <h2>Rekordy</h2>
+    <div class="spread" style="margin-bottom:10px">
+      <h2 style="margin:0">Rekordy</h2>
+      <span class="muted small">${hotova.length?`z ${hotova.length} dohraných kol`:"zatím není dohrané kolo"}</span>
+    </div>
+    ${hotova.length?"":`<div class="banner">Rekordy a průměry se počítají až z kol, která mají všechny zápasy odehrané.</div>`}
+    ${rozehrano.length?`<p class="muted small" style="margin:-2px 0 12px">${rozehrano.join(". a ")}. kolo se ještě dohrává, do rekordů se započítá až celé.</p>`:""}
     <div class="recs">
       ${bestRound?rec("Nejlepší kolo sezony", bestRound.pts+" b", esc(bestRound.p.name)+" · "+bestRound.r+". kolo"):""}
       ${streaks[0]&&streaks[0].best?rec("Nejdelší série s přesnou trefou", streaks[0].best+"×", esc(streaks[0].p.name)+" po sobě jdoucích kol"):""}
       ${worstRound?rec("Nejtěžší kolo", worstRound.prum.toFixed(1).replace(".",",")+" b", worstRound.r+". kolo · průměr na hráče"):""}
       ${hardest?rec("Zápas, který nesedl", hardest.m.h+" "+hardest.m.hs+":"+hardest.m.as+" "+hardest.m.a, (hardest.sum/hardest.n).toFixed(2).replace(".",",")+" bodu na tipujícího"):""}
       ${easiest&&easiest.ex?rec("Nejjasnější zápas", easiest.ex+" z "+easiest.n+" přesně", esc(easiest.m.h)+" – "+esc(easiest.m.a)):""}
-      ${rec("Průměr na kolo", playedRounds.length&&rows.length ? (rows.reduce((s,r)=>s+r.pts,0)/rows.length/playedRounds.length).toFixed(1).replace(".",",")+" b" : "–", "na jednoho hráče")}
+      ${rec("Průměr na kolo", hotova.length&&rows.length
+        ? (rows.reduce((s,r)=>s+ptsInRounds(r.p.id,hotova),0)/rows.length/hotova.length).toFixed(1).replace(".",",")+" b"
+        : "–", hotova.length?"na hráče, z "+hotova.length+" dohraných kol":"zatím není dohrané kolo")}
     </div>
   </div>
 
@@ -1786,7 +1815,7 @@ function viewStaty(){
         return `<tr class="${r.p.id===myPlayerId()?"me":""}">
           <td><a href="#/profil/${r.p.id}" data-profil="${r.p.id}">${esc(r.p.name)}</a></td>
           <td class="num"><strong>${r.pts}</strong></td>
-          <td class="num">${playedRounds.length?(r.pts/playedRounds.length).toFixed(1).replace(".",","):"–"}</td>
+          <td class="num">${hotova.length?(ptsInRounds(r.p.id,hotova)/hotova.length).toFixed(1).replace(".",","):"–"}</td>
           <td class="num">${r.cnt?(r.pts/r.cnt).toFixed(2).replace(".",","):"–"}</td>
           <td class="num">${r.ex}</td>
           <td class="num">${r.cnt?Math.round(r.ok/r.cnt*100):0} %</td>
@@ -1794,7 +1823,8 @@ function viewStaty(){
         </tr>`;
       }).join("")}</tbody>
     </table></div>
-    <p class="muted tiny" style="margin:10px 0 0">Série = nejvíc po sobě jdoucích kol s aspoň jedním přesným výsledkem.</p>
+    <p class="muted tiny" style="margin:10px 0 0">Série = nejvíc po sobě jdoucích kol s aspoň jedním přesným výsledkem.
+      Sloupce <em>Ø kolo</em> a <em>Série</em> berou jen dohraná kola, <em>Body</em> a <em>Přesné</em> počítají všechno odehrané.</p>
   </div>
 
   <div class="grid cols-2">
@@ -1811,8 +1841,8 @@ function viewStaty(){
     ${topTips.length?`<div class="card"><h2>Nejčastěji tipované výsledky</h2>
       <table><tbody>${topTips.map(([k,v])=>`<tr><td><span class="pill p1">${k}</span></td><td class="num">${v}×</td></tr>`).join("")}</tbody></table>
     </div>`:""}
-    ${playedRounds.length>1?`<div class="card"><h2>Body podle kol</h2>
-      <table><tbody>${playedRounds.map(r=>{
+    ${hotova.length>1?`<div class="card"><h2>Body podle kol</h2>
+      <table><tbody>${hotova.map(r=>{
         const rs=roundStandings(r); const pr=rs.reduce((s,x)=>s+x.pts,0)/(rs.length||1);
         return `<tr><td><a href="#/kolo/${r}" data-kolo="${r}">${r}. kolo</a></td>
           <td class="num muted">Ø ${pr.toFixed(1).replace(".",",")}</td>
