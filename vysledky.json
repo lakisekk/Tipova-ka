@@ -1,5 +1,5 @@
 {
- "updated": "2026-10-25T14:54:02Z",
+ "updated": "2026-10-25T18:14:12Z",
  "source": "TheSportsDB · Czech First League",
  "results": [
   {
@@ -121,7 +121,9 @@
    "home": "Plzeň",
    "away": "Pardubice",
    "date": "2026-10-25",
-   "time": "18:00"
+   "time": "18:00",
+   "hs": 1,
+   "as": 2
   },
   {
    "round": 12,
@@ -129,8 +131,8 @@
    "away": "Slovácko",
    "date": "2026-10-25",
    "time": "15:00",
-   "hs": 3,
-   "as": 0
+   "hs": 5,
+   "as": 1
   },
   {
    "round": 12,
