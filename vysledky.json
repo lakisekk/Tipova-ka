@@ -1,5 +1,5 @@
 {
- "updated": "2026-10-25T18:14:12Z",
+ "updated": "2026-10-27T22:09:17Z",
  "source": "TheSportsDB · Czech First League",
  "results": [
   {
@@ -96,7 +96,8 @@
    "home": "Liberec",
    "away": "Baník",
    "date": "2026-10-24",
-   "time": "15:00"
+   "time": "15:00",
+   "post": true
   },
   {
    "round": 12,
