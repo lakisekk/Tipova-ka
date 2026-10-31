@@ -1,5 +1,5 @@
 {
- "updated": "2026-10-31T15:58:36Z",
+ "updated": "2026-10-31T19:53:02Z",
  "source": "TheSportsDB · Czech First League",
  "results": [
   {
@@ -158,7 +158,9 @@
    "home": "Olomouc",
    "away": "Zbrojovka",
    "date": "2026-10-31",
-   "time": "18:00"
+   "time": "18:00",
+   "hs": 3,
+   "as": 0
   },
   {
    "round": 13,
