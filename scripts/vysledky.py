@@ -36,6 +36,29 @@ MAP = {
     "artis brno":"Artis", "sk artis brno":"Artis", "artis":"Artis",
 }
 
+# Stavy, kdy je zápas opravdu dohraný. Všechno ostatní (1H, HT, 2H, ET, LIVE…)
+# znamená, že se hraje a průběžné skóre se nesmí brát jako výsledek.
+DOHRANO = {"FT","AET","PEN","AP","FT_PEN","PENALTIES","MATCH FINISHED","FINISHED","ENDED","AWARDED","WO"}
+ODLOZENO = {"PST","POSTP","POSTPONED","CANC","CANCELLED","CANCELED","ABD","ABANDONED","SUSP","SUSPENDED","TBD"}
+# Zápas včetně poločasu a nastavení trvá zhruba dvě hodiny. Dřív konečný být nemůže.
+MIN_MINUT = 105
+
+def je_dohrano(stav, ts):
+    """Konečný výsledek bereme jen u jasně dohraných zápasů. Když zdroj stav nevyplní,
+    pustíme skóre až s odstupem od výkopu — nikdy ne v průběhu."""
+    if stav in DOHRANO:
+        return True
+    if stav and stav not in ("", "NS", "TBD"):
+        return False                      # 1H / HT / 2H / ET / LIVE a podobně
+    if not ts:
+        return False
+    try:
+        vykop = datetime.datetime.strptime(ts[:19], "%Y-%m-%dT%H:%M:%S")
+    except ValueError:
+        return False
+    ted = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+    return (ted - vykop).total_seconds() >= MIN_MINUT * 60
+
 def norm(s):
     s = unicodedata.normalize("NFD", str(s)).encode("ascii","ignore").decode()
     return " ".join(s.lower().replace(".", " ").replace("-", " ").split())
@@ -67,7 +90,7 @@ def stahni(r):
         return json.load(resp).get("events") or []
 
 def main():
-    vysledky, nesparovano, chyby = [], set(), 0
+    vysledky, nesparovano, rozehrane, chyby = [], set(), [], 0
     for r in ROUNDS:
         try:
             udalosti = stahni(r)
@@ -96,13 +119,17 @@ def main():
                 except ValueError:
                     pass
 
-            stav = (e.get("strStatus") or "").upper()
+            stav = (e.get("strStatus") or "").strip().upper()
             hs, as_ = e.get("intHomeScore"), e.get("intAwayScore")
-            if stav in ("PST","POSTP","CANC","ABD") or str(e.get("strPostponed","")).lower() == "yes":
+
+            if stav in ODLOZENO or str(e.get("strPostponed","")).lower() == "yes":
                 if hs is None or as_ is None:
                     radek["post"] = True
-            elif hs is not None and as_ is not None:
+            elif hs is not None and as_ is not None and je_dohrano(stav, ts):
                 radek["hs"], radek["as"] = int(hs), int(as_)
+            elif hs is not None and as_ is not None:
+                # zápas běží — průběžné skóre schválně nezapisujeme, bodovalo by se předčasně
+                rozehrane.append(f'{h} – {a} ({stav or "bez stavu"} {hs}:{as_})')
             vysledky.append(radek)
 
     if chyby == len(ROUNDS):
@@ -121,6 +148,8 @@ def main():
         json.dump(payload, f, ensure_ascii=False, indent=1)
 
     print(f"Zapsáno {len(vysledky)} zápasů do {OUT} — {se_skore} s výsledkem, {odlozene} odložených.")
+    if rozehrane:
+        print("Rozehrané zápasy (skóre zatím nezapisuji): " + ", ".join(rozehrane))
     if nesparovano:
         print("Nespárované týmy: " + ", ".join(sorted(nesparovano)), file=sys.stderr)
 
