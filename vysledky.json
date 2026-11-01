@@ -1,5 +1,5 @@
 {
- "updated": "2026-10-31T19:53:02Z",
+ "updated": "2026-11-01T13:15:18Z",
  "source": "TheSportsDB · Czech First League",
  "results": [
   {
@@ -194,7 +194,9 @@
    "home": "Boleslav",
    "away": "Hradec",
    "date": "2026-11-01",
-   "time": "13:00"
+   "time": "13:00",
+   "hs": 0,
+   "as": 0
   },
   {
    "round": 13,
