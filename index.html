@@ -897,19 +897,43 @@ function countdownText(target){
   return `${pad(d)}:${pad(hh)}:${pad(mm)}:${pad(ss)}`;   // DD:HH:MM:SS
 }
 
-// Kanál se po načtení stránky obnovuje sám. Během zápasů často, jinak zvolna —
-// ať se otevřená stránka drží aktuální, ale zbytečně nebombarduje server.
+/* Jak často se stránka ptá zdroje. Řídí se tím, co se zrovna hraje:
+   – zápas běží nebo právě dohrál → každou minutu, ať je výsledek hned po konci
+   – hraje se kolo, až do šesti hodin po jeho posledním zápase → každých pět minut
+   – jinak klidový režim                                                          */
+
+
+function feedMode(){
+  const now = Date.now();
+  const bezi = S.matches.some(m=>{
+    if(played(m) || postponed(m)) return false;
+    const ko = kick(m).getTime();
+    return now > ko - BEZI_OD && now < ko + BEZI_DO;
+  });
+  if(bezi) return {ms:60e3, kod:"zapas"};
+
+  if(ROUNDS.some(roundLive)) return {ms:5*60e3, kod:"kolo"};
+
+  const h = new Date().getHours();
+  return (h>=9 && h<=23) ? {ms:20*60e3, kod:"klid"} : {ms:60*60e3, kod:"noc"};
+}
+function feedDelay(){ return feedMode().ms; }
+
+// Krátká věta do patičky, ať je na první pohled vidět, že se výsledky kontrolují.
+function feedStatusLine(){
+  const popis = {zapas:"zápasy běží, kontrola každou minutu", kolo:"hraje se kolo, kontrola každých 5 minut",
+                 klid:"kontrola každých 20 minut", noc:"noční režim, kontrola jednou za hodinu"}[feedMode().kod];
+  if(SRC_OK) return `Výsledky ověřeny ${esc(fmtAgo(SRC_OK))} přímo u zdroje · ${popis}.`;
+  if(SRC_ERR) return `Zdroj se teď nedaří načíst (${esc(SRC_ERR)}), jedu ze záložního souboru · ${popis}.`;
+  return `Výsledky se načítají · ${popis}.`;
+}
+
 function startFeedPolling(){
-  const tick=()=>{
-    const hrs=new Date().getHours();
-    const zapasy = S.matches.some(m=>{
-      const ko=kick(m).getTime(), now=Date.now();
-      return now>ko && now<ko+3*3600e3;          // zápas právě běží nebo právě dohrál
-    });
-    const prodleva = zapasy ? 120e3 : (hrs>=10 && hrs<=23 ? 900e3 : 3600e3);
-    loadResultsFeed().finally(()=>setTimeout(tick, prodleva));
-  };
-  setTimeout(tick, 120e3);
+  const tick=()=>{ loadResultsFeed().finally(()=>setTimeout(tick, feedDelay())); };
+  setTimeout(tick, feedDelay());
+  // rozpis se potvrzuje zvlášť a zřídka — hned po načtení a pak jednou za šest hodin
+  setTimeout(loadSchedule, 8e3);
+  setInterval(loadSchedule, 6*3600e3);
 }
 
 function startTicker(){
@@ -951,6 +975,8 @@ function applyResultsFeed(d){
         if(d2) m.date=d2;
         if(t2) m.time=t2;
         m.official = true; nd++;
+      } else if(d2 && t2 && !m.official){
+        m.official = true; nd++;          // termín sedí, jen ho zdroj potvrdil
       }
     }
 
@@ -960,10 +986,13 @@ function applyResultsFeed(d){
     }
     if(hs==null || as==null) return;
     if(m.manual) return;                       // co zadal správce ručně, kanál nepřepisuje
+    if(m.src && !row.final) return;            // co potvrdil přímý zdroj, soubor nepřepisuje
     // Pojistka proti průběžnému skóre: zápas i s poločasem a nastavením trvá přes
-    // devadesát minut, dřív konečný výsledek znát nejde.
-    if(Date.now() - kick(m).getTime() < 105*60e3) return;
+    // devadesát minut, dřív konečný výsledek znát nejde. U přímého zdroje ji nahrazuje
+    // jeho vlastní stav zápasu (FT), který je spolehlivější než náš uložený výkop.
+    if(!row.final && Date.now() - kick(m).getTime() < 105*60e3) return;
     if(m.hs!==+hs || m.as!==+as || m.post){ m.hs=+hs; m.as=+as; m.post=false; n++; }
+    if(row.final) m.src = true;
   });
   if(n || nd){ S.feedAt = d.updated || new Date().toISOString(); save(); }
   return n + nd;
@@ -973,20 +1002,148 @@ function feedUrl(){ return (S.cfg && S.cfg.feedUrl || "").trim() || "./vysledky.
 
 let FEED_CHECKED = null;   // kdy naposled proběhlo stažení (jen pro tuhle relaci)
 let FEED_ERR = null;
+let SRC_OK = null, SRC_ERR = null;
+
+/* ---- výsledky rovnou od zdroje ------------------------------------------
+   Prohlížeč každého návštěvníka si sáhne přímo do TheSportsDB. Nic se nemusí
+   nikam nahrávat ani commitovat, takže když robot na GitHubu neběží, stránka
+   to nepozná. Soubor vysledky.json zůstává jako záloha pro případ, že by
+   zdroj vypadl nebo zakázal přístup z prohlížeče.                           */
+const SRC = { league:"4631", season:"2026-2027", key:"123" };
+function srcUrl(r){
+  return "https://www.thesportsdb.com/api/v1/json/"+SRC.key
+    +"/eventsround.php?id="+SRC.league+"&r="+r+"&s="+SRC.season;
+}
+const ST_DOHRANO  = ["FT","AET","PEN","AP","FT_PEN","PENALTIES","MATCH FINISHED","FINISHED","ENDED","AWARDED","WO"];
+const ST_ODLOZENO = ["PST","POSTP","POSTPONED","CANC","CANCELLED","CANCELED","ABD","ABANDONED","SUSP","SUSPENDED"];
+
+function srcStamp(ts){
+  const t = Date.parse(String(ts||"").replace(" ","T").slice(0,19)+"Z");
+  return isFinite(t) ? t : null;
+}
+// Konečný výsledek bereme jen u jasně dohraných zápasů. Když zdroj stav nevyplní,
+// pustíme skóre až s odstupem od výkopu — nikdy ne v průběhu.
+function srcFinal(stav, ts){
+  const s = String(stav||"").trim().toUpperCase();
+  if(ST_DOHRANO.includes(s)) return true;
+  if(s && s!=="NS" && s!=="TBD") return false;      // 1H / HT / 2H / ET / LIVE…
+  const t = srcStamp(ts);
+  return t!==null && Date.now()-t >= 105*60e3;
+}
+// UTC značka zdroje na pražský čas, ať sedí termín výkopu.
+function srcLocal(ts){
+  const t = srcStamp(ts); if(t===null) return null;
+  try{
+    const f = new Intl.DateTimeFormat("sv-SE",{timeZone:"Europe/Prague",
+      year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false});
+    const v = f.format(new Date(t)).replace("T"," ");
+    return { date:v.slice(0,10), time:v.slice(11,16) };
+  }catch(e){ return null; }
+}
+function srcTeam(name){ const h=findTeams(String(name||"")); return h.length ? h[0].k : null; }
+
+const BEZI_OD = 10*60e3, BEZI_DO = 3*3600e3, PO_KOLE = 6*3600e3;
+
+// Okno kola: od půl hodiny před prvním výkopem do šesti hodin po posledním.
+// V něm se stránka ptá zdroje často — i když už jsou všechny výsledky doma,
+// ať stihne zachytit případnou opravu skóre.
+function roundWindow(r){
+  const ms = roundMatches(r);
+  if(!ms.length) return null;
+  const t = ms.map(m=>kick(m).getTime());
+  return { od: Math.min.apply(null,t) - 30*60e3, do: Math.max.apply(null,t) + PO_KOLE };
+}
+function roundLive(r){
+  const w = roundWindow(r), now = Date.now();
+  return !!w && now > w.od && now < w.do;
+}
+
+// Kola, na která se ptáme: co se právě hraje, a co ještě nemá výsledky. Nejvýš dvě.
+function srcRounds(){
+  const now=Date.now(), cand=[];
+  ROUNDS.forEach(r=>{
+    const ms=roundMatches(r); if(!ms.length) return;
+    const live = roundLive(r);
+    if(!live && ms.every(played)) return;           // dohráno a mimo okno — nemá se co měnit
+    const first = Math.min.apply(null, ms.map(m=>kick(m).getTime()));
+    if(!live && first-now > 7*864e5) return;        // kolo je ještě daleko
+    cand.push({r, d: live ? -1 : Math.abs(now-first)});
+  });
+  cand.sort((a,b)=>a.d-b.d);
+  return cand.slice(0,2).map(x=>x.r);
+}
+
+// Kola dopředu, kterým liga ještě nepotvrdila termín výkopu. Tahle větev drží
+// rozpis aktuální, aniž by čekala, až se kolo začne hrát.
+function planRounds(){
+  const now=Date.now(), cand=[];
+  ROUNDS.forEach(r=>{
+    const ms=roundMatches(r); if(!ms.length) return;
+    if(ms.every(m=>m.official || m.edited)) return;     // termíny už potvrzené
+    const first = Math.min.apply(null, ms.map(m=>kick(m).getTime()));
+    if(first < now - 6*3600e3) return;                  // kolo je za námi
+    if(first - now > 45*864e5) return;                  // tak daleko liga ještě nevypsala
+    cand.push({r, d:first});
+  });
+  cand.sort((a,b)=>a.d-b.d);
+  return cand.slice(0,3).map(x=>x.r);
+}
+
+function loadDirectFeed(rs){
+  rs = rs || srcRounds();
+  if(!rs.length) return Promise.resolve(0);
+  return Promise.all(rs.map(r=>
+    fetch(srcUrl(r),{cache:"no-store"})
+      .then(x=>{ if(!x.ok) throw new Error("zdroj odpověděl "+x.status); return x.json(); })
+      .then(d=>({r, ev:(d&&d.events)||[], err:null}))
+      .catch(err=>({r, ev:[], err:err.message||"nedostupný"}))
+  )).then(packs=>{
+    const chyba = packs.find(p=>p.err);
+    const rows=[];
+    packs.forEach(p=>p.ev.forEach(e=>{
+      const h=srcTeam(e.strHomeTeam), a=srcTeam(e.strAwayTeam);
+      if(!h || !a) return;
+      const row = {round:+(e.intRound||p.r), home:h, away:a};
+      const loc = srcLocal(e.strTimestamp);
+      if(loc){ row.date=loc.date; row.time=loc.time; }
+      const st = String(e.strStatus||"").trim().toUpperCase();
+      const hs = e.intHomeScore, as = e.intAwayScore;
+      const maSkore = hs!==null && hs!=="" && hs!==undefined && as!==null && as!=="" && as!==undefined;
+      if((ST_ODLOZENO.includes(st) || String(e.strPostponed||"").toLowerCase()==="yes") && !maSkore){
+        row.post = true;
+      } else if(maSkore && srcFinal(st, e.strTimestamp)){
+        row.hs = +hs; row.as = +as; row.final = true;
+      }
+      rows.push(row);
+    }));
+    if(chyba && !rows.length){ SRC_ERR = chyba.err; return 0; }
+    SRC_OK = new Date().toISOString(); SRC_ERR = chyba ? chyba.err : null;
+    return rows.length ? applyResultsFeed({results:rows, updated:SRC_OK}) : 0;
+  }).catch(err=>{ SRC_ERR = err.message || "nepodařilo se načíst"; return 0; });
+}
 
 // Kanál se použije i na zařízení správce. Jeho práci chrání příznaky u jednotlivých
 // zápasů (manual, edited), ne razítko celého souboru — to jen zbytečně blokovalo
 // nové výsledky, jakmile správce cokoli uložil.
-function loadResultsFeed(){
+// Rozpis dopředu. Běží zřídka, jen potvrzuje termíny výkopů.
+function loadSchedule(){
+  const rs = planRounds();
+  return rs.length ? loadDirectFeed(rs) : Promise.resolve(0);
+}
+
+function loadFileFeed(){
   return fetch(feedUrl(),{cache:"no-store"})
     .then(x=>{ if(!x.ok) throw new Error("soubor nenalezen ("+x.status+")"); return x.json(); })
-    .then(d=>{
-      FEED_CHECKED = new Date().toISOString(); FEED_ERR = null;
-      const n = applyResultsFeed(d);
-      if(n) render();
-      return n;
-    })
+    .then(d=>{ FEED_CHECKED = new Date().toISOString(); FEED_ERR = null; return applyResultsFeed(d); })
     .catch(err=>{ FEED_ERR = err.message || "nepodařilo se načíst"; return 0; });
+}
+
+// Nejdřív přímý zdroj, teprve pak soubor. Zápas potvrzený zdrojem už soubor nepřepíše,
+// takže zastaralý vysledky.json nemůže vrátit zpátky starý nebo průběžný výsledek.
+function loadResultsFeed(){
+  return loadDirectFeed()
+    .then(a => loadFileFeed().then(b => a+b))
+    .then(n => { if(n) render(); return n; });
 }
 
 function resultsExport(){
@@ -1998,12 +2155,13 @@ function adminVysledky(){
           <span style="display:flex;align-items:center;gap:7px;flex:1;min-width:0;flex-direction:row-reverse;text-align:right">${crest(m.a,"s")}<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(m.a)}</span></span>
         </div>
         <div class="tipinputs">
+          ${m.manual?`<button class="tag" data-act="unfreeze" data-id="${m.id}" title="Výsledek byl zadán ručně, takže ho automatika nepřepisuje. Klikni pro uvolnění." style="cursor:pointer;border:0">🔒 ručně</button>`:""}
           <label class="postbox" title="Zápas odložen na neznámý termín">
             <input type="checkbox" data-post="${m.id}" ${m.post?"checked":""}><span>odl.</span>
           </label>
-          <input type="number" min="0" max="20" inputmode="numeric" data-res="${m.id}" data-side="h" value="${m.hs??""}" aria-label="Góly ${esc(m.h)}">
+          <input type="number" min="0" max="20" inputmode="numeric" data-res="${m.id}" data-side="h" data-orig="${m.hs??""}" value="${m.hs??""}" aria-label="Góly ${esc(m.h)}">
           <span class="sep">:</span>
-          <input type="number" min="0" max="20" inputmode="numeric" data-res="${m.id}" data-side="a" value="${m.as??""}" aria-label="Góly ${esc(m.a)}">
+          <input type="number" min="0" max="20" inputmode="numeric" data-res="${m.id}" data-side="a" data-orig="${m.as??""}" value="${m.as??""}" aria-label="Góly ${esc(m.a)}">
         </div>
       </div>`).join("")}
     <p class="muted tiny" style="margin:12px 0 0">Zaškrtni <strong>odl.</strong> u zápasu, který se nehrál a nemá náhradní termín.
@@ -2058,23 +2216,33 @@ function adminVysledky(){
   <div class="card">
     <div class="spread" style="margin-bottom:6px">
       <h3 style="margin:0">Automatické výsledky</h3>
-      ${FEED_ERR?`<span class="tag live">chyba: ${esc(FEED_ERR)}</span>`
-        :FEED_CHECKED?`<span class="tag done">zkontrolováno ${esc(fmtAgo(FEED_CHECKED))}</span>`
+      ${SRC_OK?`<span class="tag done">zdroj ${esc(fmtAgo(SRC_OK))}</span>`
+        :SRC_ERR?`<span class="tag live">zdroj: ${esc(SRC_ERR)}</span>`
         :`<span class="tag">zatím nenačteno</span>`}
     </div>
-    <p class="muted small">Stránka si sama stahuje výsledky ze souboru <code>vysledky.json</code> vedle sebe — při každém otevření
-      a pak průběžně, během zápasů každé dvě minuty. Kromě skóre umí převzít i odložení zápasu a oficiální termíny výkopů.
-      Ten soubor plní robot na GitHubu, nemusíš dělat nic.</p>
-    <label class="fld"><span>Jiná adresa (nepovinné)</span><input type="url" id="feedurl" value="${esc(S.cfg.feedUrl||"")}" placeholder="prázdné = vysledky.json vedle stránky"></label>
-    <div class="row">
-      <button class="btn secondary" data-act="save-feed">Uložit adresu</button>
-      <button class="btn" data-act="fetch-feed">Načíst teď</button>
+    <p class="muted small" style="margin-bottom:6px"><strong>${feedStatusLine()}</strong></p>
+    <p class="muted small">Stránka si bere výsledky <strong>rovnou od zdroje</strong> (TheSportsDB) — v prohlížeči každého,
+      kdo ji otevře, a pak průběžně, během zápasů každé dvě minuty. Nic se nikam nenahrává a nečeká se na robota na GitHubu,
+      takže když robot neběží, je to jedno. Zapíše se jen zápas, který zdroj označí za dohraný; průběžné skóre nikdy.
+      Soubor <code>vysledky.json</code> zůstává jako záloha, kdyby zdroj vypadl — zápas potvrzený zdrojem už ale nepřepíše.</p>
+    <div class="row" style="margin-bottom:10px">
+      <span class="muted tiny">${FEED_ERR?`záloha: ${esc(FEED_ERR)}`
+        :FEED_CHECKED?`záloha zkontrolována ${esc(fmtAgo(FEED_CHECKED))}`:`záloha zatím nenačtena`}</span>
     </div>
+    <label class="fld"><span>Jiná adresa zálohy (nepovinné)</span><input type="url" id="feedurl" value="${esc(S.cfg.feedUrl||"")}" placeholder="prázdné = vysledky.json vedle stránky"></label>
+    <div class="row">
+      <button class="btn" data-act="fetch-feed">Načíst teď</button>
+      <button class="btn secondary" data-act="save-feed">Uložit adresu</button>
+      ${S.matches.some(m=>m.manual)?`<button class="btn danger" data-act="unfreeze-all">Uvolnit ručně zadané (${S.matches.filter(m=>m.manual).length})</button>`:""}
+    </div>
+    ${S.matches.some(m=>m.manual)?`<div class="banner" style="margin-top:12px">U ${S.matches.filter(m=>m.manual).length} zápasů je výsledek zadaný ručně, takže je automatika nepřepisuje.
+      ${esc(S.matches.filter(m=>m.manual).slice(0,6).map(m=>m.h+"–"+m.a+" "+m.hs+":"+m.as).join(", "))}${S.matches.filter(m=>m.manual).length>6?" …":""}.
+      Jestli některý nesedí, uvolni je a stránka si stáhne správné.</div>`:""}
     <div id="feedout"></div>
     <p class="muted tiny" style="margin:10px 0 0">
-      Data v kanálu jsou z ${S.feedAt?esc(fmtAgo(S.feedAt)):"neznámé doby"}. Robot commituje jen při skutečné změně,
-      takže když se od minula nic neodehrálo, je tohle datum starší — to je v pořádku.
-      Ručně upravené termíny a ručně zadané výsledky kanál nikdy nepřepíše.</p>
+      Poslední změna z automatiky: ${S.feedAt?esc(fmtAgo(S.feedAt)):"neznámé doby"}. Když se od minula nic neodehrálo,
+      je tohle datum starší — to je v pořádku.
+      Ručně upravené termíny a ručně zadané výsledky automatika nikdy nepřepíše.</p>
   </div>`;
 }
 
@@ -2380,7 +2548,8 @@ function render(){
     `<p style="margin:0">Tipovačka Chance Liga 2026/27 · kola ${ROUNDS[0]}–${ROUNDS[ROUNDS.length-1]}
      · <a href="#/staty" data-go="staty">statistiky</a>
      · <a href="#/pravidla" data-go="pravidla">pravidla</a>
-     · <a href="#/admin" data-go="admin">přihlášení správce</a></p>`;
+     · <a href="#/admin" data-go="admin">přihlášení správce</a></p>
+     <p class="tiny" style="margin:6px 0 0;opacity:.75">${feedStatusLine()}</p>`;
 
   const banner = VIEW.msg ? `<div class="banner ${VIEW.msg.kind==="err"?"err":"ok"}">${esc(VIEW.msg.msg)}</div>` : "";
   const body = {
@@ -2442,12 +2611,29 @@ document.addEventListener("click", e=>{
       if(inp.dataset.side!=="h") return;
       const mid=inp.dataset.res, m=S.matches.find(x=>x.id===mid);
       const a=document.querySelector(`[data-res="${mid}"][data-side="a"]`);
-      if(inp.value!==""&&a.value!==""){ m.hs=+inp.value; m.as=+a.value; m.post=false; m.manual=true; n++; }
-      else { m.hs=null; m.as=null; }
+      // Ručně zadaný je jen ten zápas, u kterého správce hodnotu opravdu změnil.
+      // Dřív stačilo kliknout na Uložit a zamrzlo celé kolo i s tím, co doplnila automatika.
+      const zmena = inp.value!==(inp.dataset.orig||"") || a.value!==(a.dataset.orig||"");
+      if(inp.value!==""&&a.value!==""){
+        m.hs=+inp.value; m.as=+a.value; m.post=false;
+        if(zmena){ m.manual=true; n++; }
+      }
+      else if(zmena){ m.hs=null; m.as=null; m.manual=false; }
     });
     S.matches.forEach(m=>{ if(postponed(m)) pn++; });
     save();
     toast(`Zapsáno ${n} výsledků${pn?", odložených zápasů: "+pn:""}.`);
+  }
+  else if(act==="unfreeze"){
+    const m=S.matches.find(x=>x.id===t.dataset.id);
+    if(m){ m.manual=false; save(); toast(`${m.h} – ${m.a}: uvolněno, automatika výsledek doplní sama.`); loadResultsFeed(); }
+  }
+  else if(act==="unfreeze-all"){
+    const n=S.matches.filter(x=>x.manual).length;
+    if(!n) return toast("Žádný výsledek není zamčený.");
+    if(!confirm(`Uvolnit ${n} ručně zadaných výsledků? Automatika je pak přepíše podle zdroje.`)) return;
+    S.matches.forEach(m=>m.manual=false); save();
+    toast(`Uvolněno ${n} výsledků, stahuji aktuální.`); loadResultsFeed();
   }
   else if(act==="save-dates"){
     let n=0;
@@ -2484,27 +2670,16 @@ document.addEventListener("click", e=>{
 
   else if(act==="save-feed"){ S.cfg.feedUrl=document.getElementById("feedurl").value.trim(); save(); toast("Adresa uložena."); }
   else if(act==="fetch-feed"){
-    const url=(document.getElementById("feedurl").value||"").trim();
-    if(!url){ toast("Nejdřív vyplň adresu.","err"); return; }
     const out=document.getElementById("feedout");
     out.innerHTML=`<div class="banner">Načítám…</div>`;
-    fetch(url,{cache:"no-store"}).then(x=>{ if(!x.ok) throw new Error("server odpověděl "+x.status); return x.json(); })
-      .then(data=>{
-        const arr=Array.isArray(data)?data:(data.matches||data.results||[]);
-        let n=0, skip=0;
-        arr.forEach(row=>{
-          const h=findTeams(String(row.home||row.h||"")), a=findTeams(String(row.away||row.a||""));
-          const hs=row.hs??row.homeScore??row.hg, as=row.as??row.awayScore??row.ag;
-          if(!h.length||!a.length||hs==null||as==null){ skip++; return; }
-          const m=S.matches.find(x=>x.h===h[0].k&&x.a===a[0].k);
-          if(!m){ skip++; return; }
-          m.hs=+hs; m.as=+as; n++;
-        });
-        save();
-        out.innerHTML=`<div class="banner ok">Načteno ${n} výsledků${skip?", "+skip+" řádků se nepodařilo spárovat":""}.</div>`;
-        setTimeout(render,1200);
-      })
-      .catch(err=>{ out.innerHTML=`<div class="banner err">Nepovedlo se: ${esc(err.message)}. Nejčastěji chybí u zdroje hlavička CORS, nebo je adresa špatně.</div>`; });
+    loadResultsFeed().then(n=>{
+      const o=document.getElementById("feedout"); if(!o) return;
+      if(SRC_ERR && !SRC_OK)
+        o.innerHTML=`<div class="banner err">Zdroj se nepodařilo načíst: ${esc(SRC_ERR)}. Zkouším ještě zálohu ze souboru.</div>`;
+      else
+        o.innerHTML=`<div class="banner ok">Hotovo${n?`, upraveno ${n} zápasů`:", nic nového"}.</div>`;
+      if(n) setTimeout(render,1200);
+    });
   }
 
   else if(act==="parse-tiplist"){
