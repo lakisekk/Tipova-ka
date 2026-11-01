@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-01T16:45:15Z",
+ "updated": "2026-11-01T21:15:28Z",
  "source": "TheSportsDB · Czech First League",
  "results": [
   {
@@ -212,7 +212,9 @@
    "home": "Bohemians",
    "away": "Sparta",
    "date": "2026-11-01",
-   "time": "18:00"
+   "time": "18:00",
+   "hs": 0,
+   "as": 0
   },
   {
    "round": 14,
