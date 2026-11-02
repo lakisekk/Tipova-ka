@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-01T21:15:28Z",
+ "updated": "2026-11-02T00:52:42Z",
  "source": "TheSportsDB · Czech First League",
  "results": [
   {
@@ -40,14 +40,6 @@
   },
   {
    "round": 11,
-   "home": "Artis",
-   "away": "Bohemians",
-   "date": "2026-10-17",
-   "time": "15:00",
-   "post": true
-  },
-  {
-   "round": 11,
    "home": "Jablonec",
    "away": "Plzeň",
    "date": "2026-10-18",
@@ -72,6 +64,14 @@
    "time": "13:00",
    "hs": 1,
    "as": 2
+  },
+  {
+   "round": 11,
+   "home": "Artis",
+   "away": "Bohemians",
+   "date": "2026-11-04",
+   "time": "18:00",
+   "post": true
   },
   {
    "round": 12,
