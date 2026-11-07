@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-07T16:46:03Z",
+ "updated": "2026-11-07T20:42:28Z",
  "source": "TheSportsDB · Czech First League",
  "results": [
   {
@@ -249,7 +249,9 @@
    "home": "Zbrojovka",
    "away": "Baník",
    "date": "2026-11-07",
-   "time": "18:00"
+   "time": "18:00",
+   "hs": 1,
+   "as": 3
   },
   {
    "round": 14,
