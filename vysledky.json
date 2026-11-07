@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-04T23:37:32Z",
+ "updated": "2026-11-07T16:46:03Z",
  "source": "TheSportsDB · Czech First League",
  "results": [
   {
@@ -222,21 +222,27 @@
    "home": "Zlín",
    "away": "Slovácko",
    "date": "2026-11-07",
-   "time": "15:00"
+   "time": "15:00",
+   "hs": 0,
+   "as": 1
   },
   {
    "round": 14,
    "home": "Liberec",
    "away": "Bohemians",
    "date": "2026-11-07",
-   "time": "15:00"
+   "time": "15:00",
+   "hs": 1,
+   "as": 0
   },
   {
    "round": 14,
    "home": "Hradec",
    "away": "Olomouc",
    "date": "2026-11-07",
-   "time": "15:00"
+   "time": "15:00",
+   "hs": 5,
+   "as": 0
   },
   {
    "round": 14,
