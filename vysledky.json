@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-07T20:42:28Z",
+ "updated": "2026-11-08T16:56:50Z",
  "source": "TheSportsDB · Czech First League",
  "results": [
   {
@@ -265,21 +265,27 @@
    "home": "Jablonec",
    "away": "Boleslav",
    "date": "2026-11-08",
-   "time": "15:00"
+   "time": "15:00",
+   "hs": 0,
+   "as": 0
   },
   {
    "round": 14,
    "home": "Teplice",
    "away": "Pardubice",
    "date": "2026-11-08",
-   "time": "13:00"
+   "time": "13:00",
+   "hs": 1,
+   "as": 4
   },
   {
    "round": 14,
    "home": "Slavia",
    "away": "Artis",
    "date": "2026-11-08",
-   "time": "15:00"
+   "time": "15:00",
+   "hs": 4,
+   "as": 1
   },
   {
    "round": 15,
