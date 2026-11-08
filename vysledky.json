@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-08T16:56:50Z",
+ "updated": "2026-11-08T21:01:33Z",
  "source": "TheSportsDB · Czech First League",
  "results": [
   {
@@ -258,7 +258,9 @@
    "home": "Plzeň",
    "away": "Sparta",
    "date": "2026-11-08",
-   "time": "18:00"
+   "time": "18:00",
+   "hs": 1,
+   "as": 1
   },
   {
    "round": 14,
