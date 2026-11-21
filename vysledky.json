@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-21T17:54:28Z",
+ "updated": "2026-11-21T22:53:24Z",
  "source": "TheSportsDB · Czech First League",
  "results": [
   {
@@ -312,14 +312,18 @@
    "home": "Baník",
    "away": "Teplice",
    "date": "2026-11-21",
-   "time": "15:00"
+   "time": "15:00",
+   "hs": 1,
+   "as": 2
   },
   {
    "round": 15,
    "home": "Bohemians",
    "away": "Plzeň",
    "date": "2026-11-21",
-   "time": "18:00"
+   "time": "18:00",
+   "hs": 1,
+   "as": 2
   },
   {
    "round": 15,
