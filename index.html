@@ -919,10 +919,47 @@ function feedMode(){
 }
 function feedDelay(){ return feedMode().ms; }
 
+/* Zápas, který měl dávno skončit a pořád nemá výsledek. Stává se to, když zdroj
+   zamrzne v průběžném stavu (2H) a nikdy nepřepne na FT — skóre od něj vědomě
+   nebereme, protože nemusí být konečné. Radši o tom dáme vědět, než aby se na to
+   přišlo až podle pořadí.                                                       */
+const ZPOZDENI = 3.5*3600e3;
+function overdue(){
+  const now = Date.now();
+  return S.matches.filter(m => !played(m) && !postponed(m) && now - kick(m).getTime() > ZPOZDENI);
+}
+
+/* Ruční opravy zápasů, kde se zdroj plete nebo zamrzl. Zapisují se, jako by je
+   zadal správce, takže je automatika nikdy nepřepíše a dorazí i k lidem, kteří
+   stránku otevřeli dřív — ti mají vlastní kopii dat v prohlížeči a seed je
+   nepřepíše. Každý řádek je ověřený proti oficiálním zdrojům.                   */
+const OPRAVY = [
+  // 21. 11. 2026 — zdroj zamrzl ve stavu 2H na 2:2; skutečný výsledek 1:2
+  // (Hopi 38., Musák 54., Radosta 68.), ověřeno na fkteplice.cz a denik.cz
+  {r:15, h:"Baník", a:"Teplice", hs:1, as:2}
+];
+function applyOpravy(){
+  let n = 0;
+  OPRAVY.forEach(o=>{
+    const m = S.matches.find(x=>x.r===o.r && x.h===o.h && x.a===o.a);
+    if(!m) return;
+    if(m.manual && m.hs!==null) return;        // správce už rozhodl sám, nech to být
+    if(m.hs!==o.hs || m.as!==o.as || !m.manual){
+      m.hs=o.hs; m.as=o.as; m.post=false; m.manual=true; n++;
+    }
+  });
+  if(n) save();
+  return n;
+}
+
 // Krátká věta do patičky, ať je na první pohled vidět, že se výsledky kontrolují.
 function feedStatusLine(){
   const popis = {zapas:"zápasy běží, kontrola každou minutu", kolo:"hraje se kolo, kontrola každých 5 minut",
                  klid:"kontrola každých 20 minut", noc:"noční režim, kontrola jednou za hodinu"}[feedMode().kod];
+  const ceka = overdue();
+  if(ceka.length) return `Čeká na potvrzení u ${ceka.length} ${ceka.length===1?"zápasu":"zápasů"} `
+    + `(${esc(ceka.slice(0,3).map(m=>m.h+"–"+m.a).join(", "))}${ceka.length>3?" a dalších":""}) — `
+    + `zdroj u nich zatím nepotvrdil konec, výsledek proto schválně neukazujeme.`;
   if(SRC_OK) return `Výsledky ověřeny ${esc(fmtAgo(SRC_OK))} přímo u zdroje · ${popis}.`;
   if(SRC_ERR) return `Zdroj se teď nedaří načíst (${esc(SRC_ERR)}), jedu ze záložního souboru · ${popis}.`;
   return `Výsledky se načítají · ${popis}.`;
@@ -2220,6 +2257,12 @@ function adminVysledky(){
         :SRC_ERR?`<span class="tag live">zdroj: ${esc(SRC_ERR)}</span>`
         :`<span class="tag">zatím nenačteno</span>`}
     </div>
+    ${overdue().length?`<div class="banner err" style="margin-bottom:12px"><strong>Zásah ruky:</strong>
+      ${overdue().length===1?"tenhle zápas měl":"tyhle zápasy měly"} dávno skončit a zdroj u
+      ${overdue().length===1?"něj":"nich"} pořád nehlásí konec —
+      ${esc(overdue().map(m=>m.h+" – "+m.a+" ("+fmtDay(m)+" "+m.time+")").join(", "))}.
+      Skóre od zdroje v takovém stavu nebereme, protože nemusí být konečné. Zadej výsledek ručně níž
+      v „Výsledky ${overdue()[0].r}. kola“ — ručně zadané už ti automatika nepřepíše.</div>`:""}
     <p class="muted small" style="margin-bottom:6px"><strong>${feedStatusLine()}</strong></p>
     <p class="muted small">Stránka si bere výsledky <strong>rovnou od zdroje</strong> (TheSportsDB) — v prohlížeči každého,
       kdo ji otevře, a pak průběžně, během zápasů každé dvě minuty. Nic se nikam nenahrává a nečeká se na robota na GitHubu,
@@ -2877,9 +2920,10 @@ function boot(){
   fetch("./data.json",{cache:"no-store"}).then(x=>x.ok?x.json():null).then(d=>{
     if(!d||!d.matches) return;
     const pubT=Date.parse(d.updated||0)||0, locT=Date.parse(S.updated||0)||0;
-    if(!isAdminDevice() || pubT>locT){ S=migrate(d); save(); render(); resolveLogos(); }
+    if(!isAdminDevice() || pubT>locT){ S=migrate(d); applyOpravy(); save(); render(); resolveLogos(); }
   }).catch(()=>{});
 
+  applyOpravy();
   loadResultsFeed();
 }
 
