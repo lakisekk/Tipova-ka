@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-22T18:18:57Z",
+ "updated": "2026-11-22T23:34:47Z",
  "source": "TheSportsDB · Czech First League",
  "results": [
   {
@@ -339,7 +339,9 @@
    "home": "Sparta",
    "away": "Liberec",
    "date": "2026-11-22",
-   "time": "18:00"
+   "time": "18:00",
+   "hs": 1,
+   "as": 3
   },
   {
    "round": 15,
