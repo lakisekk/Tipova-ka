@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-21T22:53:24Z",
+ "updated": "2026-11-22T14:29:35Z",
  "source": "TheSportsDB · Czech First League",
  "results": [
   {
@@ -353,7 +353,9 @@
    "home": "Pardubice",
    "away": "Zbrojovka",
    "date": "2026-11-22",
-   "time": "13:00"
+   "time": "13:00",
+   "hs": 1,
+   "as": 1
   },
   {
    "round": 16,
