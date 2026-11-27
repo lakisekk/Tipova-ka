@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-22T23:34:47Z",
+ "updated": "2026-11-27T19:49:48Z",
  "source": "TheSportsDB · Czech First League",
  "results": [
   {
@@ -366,7 +366,9 @@
    "home": "Artis",
    "away": "Slovácko",
    "date": "2026-11-27",
-   "time": "18:00"
+   "time": "18:00",
+   "hs": 4,
+   "as": 1
   },
   {
    "round": 16,
